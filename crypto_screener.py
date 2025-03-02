@@ -4,7 +4,7 @@ import pandas as pd
 import time
 
 # OKX API for all swap tickers
-API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
+API_URL = "https://api.coindcx.com/exchange/v1/market_data"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener (USDT Swaps)")
