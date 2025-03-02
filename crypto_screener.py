@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import time
 
-# OKX API URL for all swap tickers
+# OKX API for all swap tickers
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
@@ -68,6 +68,10 @@ def calculate_5m_change(df):
     df["5m Change (%)"] = changes
     return df
 
+# Sort options
+sort_col = st.selectbox("Sort by:", ["Price (USDT)", "5m Change (%)"], index=0)
+sort_order = st.radio("Order:", ["Descending", "Ascending"], index=0)
+
 # Create a single placeholder for dynamic updates
 table_placeholder = st.empty()
 
@@ -75,6 +79,12 @@ while True:
     df = fetch_data()
     if not df.empty:
         df = calculate_5m_change(df)
+
+        # Sort data based on selection
+        df.replace("-", "0", inplace=True)  # Convert "-" to "0" for sorting
+        df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
+        df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"), inplace=True)
+        
         table_placeholder.dataframe(df, height=600)  # Updates the same box
 
     time.sleep(1)  # Refresh every second
