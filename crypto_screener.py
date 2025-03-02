@@ -1,32 +1,28 @@
-
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
-import plotly.graph_objects as go
 
-# OKX API
+# OKX API for all swap tickers
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 
-# Set Streamlit Page Config
+# Set Page Configuration
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 # Theme Toggle Button
 if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = True  # Default to dark mode
+    st.session_state.dark_mode = True
 
 def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
 
 st.sidebar.button("Toggle Dark/Light Mode", on_click=toggle_theme)
 
-# Apply Theme
 theme = "dark" if st.session_state.dark_mode else "light"
+
 st.markdown(f"""
     <style>
         body {{ background-color: {'#121212' if theme == 'dark' else '#FFFFFF'}; }}
-        .stTextInput, .stButton > button {{ color: {'white' if theme == 'dark' else 'black'}; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -35,7 +31,7 @@ st.title("🚀 Crypto Futures Screener")
 # Cache API Calls
 @st.cache_data(ttl=5)
 def fetch_data():
-    """Fetch all swap tickers from OKX API."""
+    """Fetch all swap futures tickers from OKX API."""
     try:
         response = requests.get(API_URL)
         data = response.json().get("data", [])
@@ -59,13 +55,12 @@ if "prev_volumes" not in st.session_state:
     st.session_state.prev_volumes = {}
 
 def track_volume(df):
-    """Filter assets with consistent volume increase or decrease."""
+    """Filter tickers with a consistent increase or decrease in volume."""
     filtered_data = []
     for _, row in df.iterrows():
         symbol = row["Symbol"]
         current_volume = row["Volume"]
 
-        # Store & Compare Volume
         if symbol in st.session_state.prev_volumes:
             prev_volume = st.session_state.prev_volumes[symbol]
             if current_volume > prev_volume:
@@ -84,19 +79,17 @@ def track_volume(df):
         st.session_state.prev_volumes[symbol] = current_volume
         filtered_data.append((symbol, row["Price"], current_volume, trend, row["Timestamp"], color))
 
-    # Convert to DataFrame
     df_filtered = pd.DataFrame(filtered_data, columns=["Symbol", "Price", "Volume", "Trend", "Timestamp", "Color"])
     return df_filtered
 
-# Convert Time to 12-Hour IST
+# Convert UTC to 12-Hour IST
 def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Engulfing Candle Analysis (Placeholder Logic)
+# Engulfing Candle Analysis (Dummy Data)
 def check_engulfing_candle(symbol):
     """Simulated Engulfing Candle Detection (Replace with real API data)."""
-    # Fetch Historical Data (Replace with actual API)
     recent_candles = [
         {"open": 100, "close": 105},  # 1H
         {"open": 105, "close": 110},  # 4H
@@ -106,9 +99,9 @@ def check_engulfing_candle(symbol):
     
     signals = []
     for timeframe, candle in zip(["1H", "4H", "1D", "1W"], recent_candles):
-        if candle["close"] > candle["open"]:  # Bullish Engulfing
+        if candle["close"] > candle["open"]:
             signals.append(f"{timeframe}: 🟢 Bullish")
-        elif candle["close"] < candle["open"]:  # Bearish Engulfing
+        elif candle["close"] < candle["open"]:
             signals.append(f"{timeframe}: 🔴 Bearish")
         else:
             signals.append(f"{timeframe}: ⚪ Neutral")
@@ -116,24 +109,31 @@ def check_engulfing_candle(symbol):
     return ", ".join(signals)
 
 # Display Data
-while True:
-    df = fetch_data()
-    if not df.empty:
-        df_filtered = track_volume(df)
+df = fetch_data()
+if not df.empty:
+    df_filtered = track_volume(df)
 
-        # Convert Timestamp to IST
-        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-        df_filtered = df_filtered.drop(columns=["Timestamp"])
+    # Convert Timestamp to IST
+    df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
+    df_filtered = df_filtered.drop(columns=["Timestamp"])
 
-        # Add Engulfing Candle Signals
-        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
+    # Add Engulfing Candle Signals
+    df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
 
-        # Apply Color Formatting
-        def highlight_trend(row):
-            return ["background-color: " + row["Color"]] * len(row)
+    # Apply Color Formatting
+    def highlight_trend(row):
+        return ["background-color: " + row["Color"]] * len(row)
 
-        # Display Data
-        st.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
+    # Display Data
+    st.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
 
-    time.sleep(1)  # Refresh every second
+    # Add TradingView Chart
+    selected_ticker = st.selectbox("Select a Symbol to View Chart", df_filtered["Symbol"].unique())
 
+    if selected_ticker:
+        st.markdown(f"""
+        <iframe src="https://www.tradingview.com/chart/?symbol=OKX:{selected_ticker.replace('-SWAP', '')}"
+        width="100%" height="500" frameborder="0"></iframe>
+        """, unsafe_allow_html=True)
+
+st.info("Data updates every 5 seconds. Only showing tickers with consistent volume trend.")
