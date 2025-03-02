@@ -11,17 +11,9 @@ st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener (All Futures Swaps)")
 
 # Store historical prices for tracking changes
-if "prev_prices_5m" not in st.session_state:
-    st.session_state.prev_prices_5m = {}
-
-if "prev_prices_15m" not in st.session_state:
-    st.session_state.prev_prices_15m = {}
-
-if "timestamps_5m" not in st.session_state:
-    st.session_state.timestamps_5m = {}
-
-if "timestamps_15m" not in st.session_state:
-    st.session_state.timestamps_15m = {}
+if "prev_prices" not in st.session_state:
+    st.session_state.prev_prices = {}
+    st.session_state.prev_update_times = {}
 
 @st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
@@ -59,16 +51,19 @@ while True:
     if not df.empty:
         # Current time in IST (when data was fetched)
         current_ist_time = convert_to_ist(pd.Timestamp.utcnow())
-        
-        # Last updated time in IST (same as current time)
-        last_updated_time = current_ist_time
-        
+
+        # Initialize or update last updated times for each symbol
+        last_updated_times = []
+        for index, row in df.iterrows():
+            symbol = row["Symbol"]
+            if symbol not in st.session_state.prev_update_times:
+                # If this is the first time, set the current time as the last updated time
+                st.session_state.prev_update_times[symbol] = current_ist_time
+            last_updated_times.append(st.session_state.prev_update_times[symbol])
+
         # Add both current time and last updated time to the dataframe
         df["Current Time (IST)"] = current_ist_time
-        df["Last Updated Time (IST)"] = last_updated_time
-        
-        # Display only "Symbol", "Price (USDT)", "Current Time", "Last Updated Time"
-        df = df[["Symbol", "Price (USDT)", "Current Time (IST)", "Last Updated Time (IST)"]]
+        df["Last Updated Time (IST)"] = last_updated_times
         
         # Update the dataframe in the Streamlit app
         table_placeholder.dataframe(df, height=600)  # Updates the same box
