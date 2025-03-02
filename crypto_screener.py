@@ -47,10 +47,9 @@ def fetch_data():
         return pd.DataFrame()
 
 def track_price_history(df):
-    """Track 5-minute and 15-minute prices."""
+    """Track 5-minute and 15-minute prices and generate signals."""
     current_time = pd.Timestamp.utcnow()
-
-    price_5m, price_15m = [], []
+    price_5m, price_15m, signals = [], [], []
 
     for index, row in df.iterrows():
         symbol = row["Symbol"]
@@ -88,8 +87,23 @@ def track_price_history(df):
             else:
                 price_15m.append(st.session_state.prev_prices_15m[symbol])
 
+        # Generate Buy/Sell signals
+        if isinstance(price_5m[-1], float) and isinstance(price_15m[-1], float):
+            change_5m = (current_price - price_5m[-1])
+            change_15m = (current_price - price_15m[-1])
+
+            if change_5m > 0 and change_15m > 0:
+                signals.append("🚀 Buy")
+            elif change_5m < 0 and change_15m < 0:
+                signals.append("⚠️ Sell")
+            else:
+                signals.append("🔄 Neutral")
+        else:
+            signals.append("🔄 Neutral")
+
     df["Price 5m Ago"] = price_5m
     df["Price 15m Ago"] = price_15m
+    df["Signal"] = signals
 
     return df
 
