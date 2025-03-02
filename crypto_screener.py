@@ -3,11 +3,11 @@ import requests
 import pandas as pd
 import time
 
-# CoinDCX API for active futures instruments
+# CoinDCX API for active futures swap instruments
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
+st.title("🚀 Real-Time Crypto Futures Screener (All Futures Swaps)")
 
 # Store historical prices for tracking changes
 if "prev_prices_5m" not in st.session_state:
@@ -24,7 +24,7 @@ if "timestamps_15m" not in st.session_state:
 
 @st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
-    """Fetch active futures instruments from CoinDCX API."""
+    """Fetch active futures swap instruments from CoinDCX API."""
     try:
         response = requests.get(API_URL)
         data = response.json()
@@ -33,9 +33,6 @@ def fetch_data():
 
         # Extract market data
         df = pd.DataFrame(data["data"])
-
-        # Filter only USDT pairs (CoinDCX typically uses symbols like BTC_USDT)
-        df = df[df["symbol"].str.endswith("USDT")]
 
         # Extract necessary columns and rename them
         df = df[["symbol", "last_price", "open_time"]]
