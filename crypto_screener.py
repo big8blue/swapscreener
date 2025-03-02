@@ -3,11 +3,11 @@ import requests
 import pandas as pd
 import time
 
-# OKX API for all swap tickers
+# CoinDCX API for all crypto futures tickers
 API_URL = "https://api.coindcx.com/exchange/v1/market_data"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener (USDT Swaps)")
+st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
 
 # Store historical prices for tracking changes
 if "prev_prices_5m" not in st.session_state:
@@ -24,7 +24,7 @@ if "timestamps_15m" not in st.session_state:
 
 @st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
-    """Fetch all USDT swap tickers from OKX API."""
+    """Fetch all USDT futures tickers from CoinDCX API."""
     try:
         response = requests.get(API_URL)
         data = response.json().get("data", [])
@@ -33,10 +33,10 @@ def fetch_data():
 
         df = pd.DataFrame(data)
         
-        # Filter only USDT pairs
-        df = df[df["instId"].str.endswith("USDT-SWAP")]
+        # Filter only USDT pairs, assuming CoinDCX includes USDT pairs in the symbols
+        df = df[df["symbol"].str.endswith("USDT")]
 
-        df = df[["instId", "last", "ts"]]
+        df = df[["symbol", "last_price", "timestamp"]]
         df.columns = ["Symbol", "Price (USDT)", "Timestamp"]
         df["Price (USDT)"] = df["Price (USDT)"].astype(float)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
