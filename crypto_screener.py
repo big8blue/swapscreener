@@ -19,7 +19,7 @@ if "timestamps_5m" not in st.session_state:
 if "timestamps_15m" not in st.session_state:
     st.session_state.timestamps_15m = {}
 
-@st.cache_data(ttl=5)  # Cache data for 5 seconds
+@st.cache_data(ttl=1)  # Cache data for 5 seconds
 def fetch_data():
     """Fetch all USDT pair tickers from CoinDCX API."""
     try:
