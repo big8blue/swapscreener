@@ -57,12 +57,18 @@ table_placeholder = st.empty()
 while True:
     df = fetch_data()
     if not df.empty:
-        # Convert to 12-hour IST format for each row
+        # Current time in IST (when data was fetched)
         current_ist_time = convert_to_ist(pd.Timestamp.utcnow())
-        df["Last Updated (IST)"] = current_ist_time
         
-        # Display only "Symbol", "Price (USDT)", and "Last Updated"
-        df = df[["Symbol", "Price (USDT)", "Last Updated (IST)"]]
+        # Last updated time in IST (same as current time)
+        last_updated_time = current_ist_time
+        
+        # Add both current time and last updated time to the dataframe
+        df["Current Time (IST)"] = current_ist_time
+        df["Last Updated Time (IST)"] = last_updated_time
+        
+        # Display only "Symbol", "Price (USDT)", "Current Time", "Last Updated Time"
+        df = df[["Symbol", "Price (USDT)", "Current Time (IST)", "Last Updated Time (IST)"]]
         
         # Update the dataframe in the Streamlit app
         table_placeholder.dataframe(df, height=600)  # Updates the same box
