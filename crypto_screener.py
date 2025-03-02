@@ -47,11 +47,10 @@ def fetch_data():
         return pd.DataFrame()
 
 def calculate_changes(df):
-    """Calculate 5-minute and 15-minute price changes and their difference."""
+    """Calculate 5-minute and 15-minute price changes and their percentage differences."""
     current_time = pd.Timestamp.utcnow()
 
-    changes_5m, changes_15m, diff_5m_15m = [], [], []
-    price_5m, price_15m = [], []
+    price_5m, change_5m, price_15m, change_15m, diff_5m_15m = [], [], [], [], []
 
     for index, row in df.iterrows():
         symbol = row["Symbol"]
@@ -62,20 +61,20 @@ def calculate_changes(df):
             st.session_state.prev_prices_5m[symbol] = current_price
             st.session_state.timestamps_5m[symbol] = current_time
             price_5m.append("-")
-            changes_5m.append("-")
+            change_5m.append("-")
         else:
             prev_price_5m = st.session_state.prev_prices_5m[symbol]
             prev_time_5m = st.session_state.timestamps_5m[symbol]
             time_diff_5m = (current_time - prev_time_5m).total_seconds() / 60  # Convert to minutes
 
             if time_diff_5m >= 5:
-                change_5m = ((current_price - prev_price_5m) / prev_price_5m) * 100
-                changes_5m.append(f"{change_5m:.2f}%")
+                percent_change_5m = ((current_price - prev_price_5m) / prev_price_5m) * 100
+                change_5m.append(f"{percent_change_5m:.2f}%")
                 price_5m.append(prev_price_5m)
                 st.session_state.prev_prices_5m[symbol] = current_price
                 st.session_state.timestamps_5m[symbol] = current_time
             else:
-                changes_5m.append("-")
+                change_5m.append("-")
                 price_5m.append(prev_price_5m)
 
         # Store & update 15-minute data
@@ -83,7 +82,7 @@ def calculate_changes(df):
             st.session_state.prev_prices_15m[symbol] = current_price
             st.session_state.timestamps_15m[symbol] = current_time
             price_15m.append("-")
-            changes_15m.append("-")
+            change_15m.append("-")
             diff_5m_15m.append("-")
         else:
             prev_price_15m = st.session_state.prev_prices_15m[symbol]
@@ -91,26 +90,26 @@ def calculate_changes(df):
             time_diff_15m = (current_time - prev_time_15m).total_seconds() / 60  # Convert to minutes
 
             if time_diff_15m >= 15:
-                change_15m = ((current_price - prev_price_15m) / prev_price_15m) * 100
-                changes_15m.append(f"{change_15m:.2f}%")
+                percent_change_15m = ((current_price - prev_price_15m) / prev_price_15m) * 100
+                change_15m.append(f"{percent_change_15m:.2f}%")
                 price_15m.append(prev_price_15m)
                 st.session_state.prev_prices_15m[symbol] = current_price
                 st.session_state.timestamps_15m[symbol] = current_time
             else:
-                changes_15m.append("-")
+                change_15m.append("-")
                 price_15m.append(prev_price_15m)
 
             # Calculate 5m-15m difference
-            if changes_5m[-1] != "-" and changes_15m[-1] != "-":
-                diff = float(changes_5m[-1].strip('%')) - float(changes_15m[-1].strip('%'))
+            if change_5m[-1] != "-" and change_15m[-1] != "-":
+                diff = float(change_5m[-1].strip('%')) - float(change_15m[-1].strip('%'))
                 diff_5m_15m.append(f"{diff:.2f}%")
             else:
                 diff_5m_15m.append("-")
 
     df["Price 5m Ago"] = price_5m
-    df["5m Change (%)"] = changes_5m
+    df["5m Change (%)"] = change_5m
     df["Price 15m Ago"] = price_15m
-    df["15m Change (%)"] = changes_15m
+    df["15m Change (%)"] = change_15m
     df["5m-15m Diff (%)"] = diff_5m_15m
 
     return df
