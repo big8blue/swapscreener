@@ -3,44 +3,43 @@ import requests
 import pandas as pd
 import time
 
-# OKX API for all swap tickers
-API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
+# CoinDCX API for all tickers
+API_URL = "https://public.coindcx.com/exchange/ticker"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener (USDT Swaps)")
+st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
 
-# Store historical prices for tracking changes
+# Initialize session state for historical prices
 if "prev_prices_5m" not in st.session_state:
     st.session_state.prev_prices_5m = {}
-
 if "prev_prices_15m" not in st.session_state:
     st.session_state.prev_prices_15m = {}
-
 if "timestamps_5m" not in st.session_state:
     st.session_state.timestamps_5m = {}
-
 if "timestamps_15m" not in st.session_state:
     st.session_state.timestamps_15m = {}
 
-@st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
+@st.cache_data(ttl=5)  # Cache data for 5 seconds
 def fetch_data():
-    """Fetch all USDT swap tickers from OKX API."""
+    """Fetch all USDT pair tickers from CoinDCX API."""
     try:
         response = requests.get(API_URL)
-        data = response.json().get("data", [])
+        data = response.json()
         if not data:
             return pd.DataFrame()
 
+        # Convert to DataFrame
         df = pd.DataFrame(data)
-        
-        # Filter only USDT pairs
-        df = df[df["instId"].str.endswith("USDT-SWAP")]
 
-        df = df[["instId", "last", "ts"]]
+        # Filter for USDT pairs
+        df = df[df["market"].str.endswith("USDT")]
+
+        # Select relevant columns
+        df = df[["market", "last_price", "timestamp"]]
         df.columns = ["Symbol", "Price (USDT)", "Timestamp"]
         df["Price (USDT)"] = df["Price (USDT)"].astype(float)
-        df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
-        
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="s")
+
         return df
     except Exception as e:
         st.error(f"Error fetching data: {e}")
@@ -51,18 +50,18 @@ def track_price_history(df):
     current_time = pd.Timestamp.utcnow()
     price_5m, price_15m, signals = [], [], []
 
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         symbol = row["Symbol"]
         current_price = row["Price (USDT)"]
 
-        # Store & update 5-minute data
+        # 5-minute tracking
         if symbol not in st.session_state.prev_prices_5m:
             st.session_state.prev_prices_5m[symbol] = current_price
             st.session_state.timestamps_5m[symbol] = current_time
             price_5m.append("-")
         else:
             prev_time_5m = st.session_state.timestamps_5m[symbol]
-            time_diff_5m = (current_time - prev_time_5m).total_seconds() / 60  # Convert to minutes
+            time_diff_5m = (current_time - prev_time_5m).total_seconds() / 60
 
             if time_diff_5m >= 5:
                 price_5m.append(st.session_state.prev_prices_5m[symbol])
@@ -71,14 +70,14 @@ def track_price_history(df):
             else:
                 price_5m.append(st.session_state.prev_prices_5m[symbol])
 
-        # Store & update 15-minute data
+        # 15-minute tracking
         if symbol not in st.session_state.prev_prices_15m:
             st.session_state.prev_prices_15m[symbol] = current_price
             st.session_state.timestamps_15m[symbol] = current_time
             price_15m.append("-")
         else:
             prev_time_15m = st.session_state.timestamps_15m[symbol]
-            time_diff_15m = (current_time - prev_time_15m).total_seconds() / 60  # Convert to minutes
+            time_diff_15m = (current_time - prev_time_15m).total_seconds() / 60
 
             if time_diff_15m >= 15:
                 price_15m.append(st.session_state.prev_prices_15m[symbol])
@@ -87,10 +86,10 @@ def track_price_history(df):
             else:
                 price_15m.append(st.session_state.prev_prices_15m[symbol])
 
-        # Generate Buy/Sell signals
+        # Generate signals
         if isinstance(price_5m[-1], float) and isinstance(price_15m[-1], float):
-            change_5m = (current_price - price_5m[-1])
-            change_15m = (current_price - price_15m[-1])
+            change_5m = current_price - price_5m[-1]
+            change_15m = current_price - price_15m[-1]
 
             if change_5m > 0 and change_15m > 0:
                 signals.append("🚀 Buy")
@@ -107,11 +106,11 @@ def track_price_history(df):
 
     return df
 
-# Sort options
+# Sorting options
 sort_col = st.selectbox("Sort by:", ["Price (USDT)", "Price 5m Ago", "Price 15m Ago"], index=0)
 sort_order = st.radio("Order:", ["Descending", "Ascending"], index=0)
 
-# Create a single placeholder for dynamic updates
+# Placeholder for dynamic updates
 table_placeholder = st.empty()
 
 while True:
@@ -119,11 +118,11 @@ while True:
     if not df.empty:
         df = track_price_history(df)
 
-        # Sort data based on selection
-        df.replace("-", "0", inplace=True)  # Convert "-" to "0" for sorting
+        # Sort data
+        df.replace("-", "0", inplace=True)
         df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
         df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"), inplace=True)
-        
-        table_placeholder.dataframe(df, height=600)  # Updates the same box
+
+        table_placeholder.dataframe(df, height=600)
 
     time.sleep(1)  # Refresh every second
