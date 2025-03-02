@@ -43,10 +43,10 @@ def fetch_data():
         return pd.DataFrame()
 
 def calculate_changes(df):
-    """Calculate 5-minute and 15-minute price changes."""
+    """Calculate 5-minute and 15-minute price changes and their difference."""
     current_time = pd.Timestamp.utcnow()
 
-    changes_5m, changes_15m = [], []
+    changes_5m, changes_15m, diff_5m_15m = [], [], []
     price_5m, price_15m = [], []
 
     for index, row in df.iterrows():
@@ -80,6 +80,7 @@ def calculate_changes(df):
             st.session_state.timestamps_15m[symbol] = current_time
             price_15m.append("-")
             changes_15m.append("-")
+            diff_5m_15m.append("-")
         else:
             prev_price_15m = st.session_state.prev_prices_15m[symbol]
             prev_time_15m = st.session_state.timestamps_15m[symbol]
@@ -95,15 +96,23 @@ def calculate_changes(df):
                 changes_15m.append("-")
                 price_15m.append(prev_price_15m)
 
+            # Calculate 5m-15m difference
+            if changes_5m[-1] != "-" and changes_15m[-1] != "-":
+                diff = float(changes_5m[-1].strip('%')) - float(changes_15m[-1].strip('%'))
+                diff_5m_15m.append(f"{diff:.2f}%")
+            else:
+                diff_5m_15m.append("-")
+
     df["Price 5m Ago"] = price_5m
     df["5m Change (%)"] = changes_5m
     df["Price 15m Ago"] = price_15m
     df["15m Change (%)"] = changes_15m
+    df["5m-15m Diff (%)"] = diff_5m_15m
 
     return df
 
 # Sort options
-sort_col = st.selectbox("Sort by:", ["Price (USDT)", "5m Change (%)", "15m Change (%)"], index=0)
+sort_col = st.selectbox("Sort by:", ["Price (USDT)", "5m Change (%)", "15m Change (%)", "5m-15m Diff (%)"], index=0)
 sort_order = st.radio("Order:", ["Descending", "Ascending"], index=0)
 
 # Create a single placeholder for dynamic updates
