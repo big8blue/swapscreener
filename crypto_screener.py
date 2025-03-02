@@ -3,13 +3,13 @@ import requests
 import pandas as pd
 import time
 
-# CoinDCX API for all tickers
-API_URL = "https://public.coindcx.com/exchange/ticker"
+# CoinDCX API for active futures instruments
+API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
+st.title("🚀 Real-Time Crypto Futures Screener (USDT Futures)")
 
-# Initialize session state for historical prices and volume
+# Initialize session state for price history
 if "prev_prices_5m" not in st.session_state:
     st.session_state.prev_prices_5m = {}
 if "prev_prices_15m" not in st.session_state:
@@ -21,23 +21,19 @@ if "timestamps_15m" not in st.session_state:
 if "prev_volumes" not in st.session_state:
     st.session_state.prev_volumes = {}
 
-@st.cache_data(ttl=5)  # Cache data for 5 seconds
+@st.cache_data(ttl=5)  # Cache for 5 seconds to reduce API calls
 def fetch_data():
-    """Fetch all USDT pair tickers from CoinDCX API."""
+    """Fetch all active USDT futures tickers from CoinDCX API."""
     try:
         response = requests.get(API_URL)
         data = response.json()
         if not data:
             return pd.DataFrame()
 
-        # Convert to DataFrame
         df = pd.DataFrame(data)
 
-        # Filter for USDT pairs
-        df = df[df["market"].str.endswith("USDT")]
-
         # Select relevant columns
-        df = df[["market", "last_price", "volume"]]
+        df = df[["instrument_name", "last_price", "quote_volume"]]
         df.columns = ["Symbol", "Price (USDT)", "Volume"]
         df["Price (USDT)"] = df["Price (USDT)"].astype(float)
         df["Volume"] = df["Volume"].astype(float)
@@ -48,7 +44,7 @@ def fetch_data():
         return pd.DataFrame()
 
 def track_signals(df):
-    """Track price momentum, RSI, EMA, and volume spikes."""
+    """Analyze price trends, RSI, EMA, and volume spikes."""
     current_time = pd.Timestamp.utcnow()
     price_5m, price_15m, signals, rsi_values, ema_values, volume_spikes = [], [], [], [], [], []
 
@@ -64,7 +60,7 @@ def track_signals(df):
             price_5m.append("-")
         else:
             prev_time_5m = st.session_state.timestamps_5m[symbol]
-            if (current_time - prev_time_5m).total_seconds() >= 300:  # 5 minutes
+            if (current_time - prev_time_5m).total_seconds() >= 300:  # 5 min
                 price_5m.append(st.session_state.prev_prices_5m[symbol])
                 st.session_state.prev_prices_5m[symbol] = current_price
                 st.session_state.timestamps_5m[symbol] = current_time
@@ -78,14 +74,14 @@ def track_signals(df):
             price_15m.append("-")
         else:
             prev_time_15m = st.session_state.timestamps_15m[symbol]
-            if (current_time - prev_time_15m).total_seconds() >= 900:  # 15 minutes
+            if (current_time - prev_time_15m).total_seconds() >= 900:  # 15 min
                 price_15m.append(st.session_state.prev_prices_15m[symbol])
                 st.session_state.prev_prices_15m[symbol] = current_price
                 st.session_state.timestamps_15m[symbol] = current_time
             else:
                 price_15m.append(st.session_state.prev_prices_15m[symbol])
 
-        # Calculate RSI (Simple approximation)
+        # RSI Calculation (Approximation)
         if isinstance(price_5m[-1], float):
             change = current_price - price_5m[-1]
             rsi = 100 - (100 / (1 + (max(change, 0) / abs(min(change, 0.0001)))))
@@ -94,7 +90,7 @@ def track_signals(df):
             rsi_values.append("-")
 
         # EMA Calculation (Simple Approximation)
-        if index > 10:  # Require some history
+        if index > 10:
             ema = (current_price * 0.1) + (df["Price (USDT)"].iloc[index - 1] * 0.9)
             ema_values.append(round(ema, 2))
         else:
