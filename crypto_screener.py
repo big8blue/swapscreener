@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 
 # CoinDCX API for all tickers
 API_URL = "https://public.coindcx.com/exchange/ticker"
@@ -49,13 +50,15 @@ sort_order = st.radio("Order:", ["Descending", "Ascending"], index=0)
 table_placeholder = st.empty()
 
 # Fetching and displaying the data with auto-refresh
-df = fetch_data()
-if not df.empty:
-    # Sort data
-    df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
-    df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"), inplace=True)
+while True:
+    df = fetch_data()
+    if not df.empty:
+        # Sort data
+        df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
+        df.sort_values(by=sort_col, ascending=(sort_order == "Ascending"), inplace=True)
 
-    table_placeholder.dataframe(df[["Symbol", "Price (USDT)", "Timestamp"]], height=600)
-
-# Use Streamlit's rerun mechanism for auto-refresh
-st.experimental_rerun()  # Automatically refresh the app every second
+        table_placeholder.dataframe(df[["Symbol", "Price (USDT)", "Timestamp"]], height=600)
+    
+    # Refresh every second
+    time.sleep(1)
+    st.experimental_rerun()  # Automatically refresh the app every second
