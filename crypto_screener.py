@@ -47,18 +47,14 @@ def fetch_data():
 
 # Create a single placeholder for dynamic updates
 table_placeholder = st.empty()
-last_updated_placeholder = st.empty()
 
 while True:
     df = fetch_data()
     if not df.empty:
-        # Display only "Symbol" and "Price (USDT)"
-        df = df[["Symbol", "Price (USDT)"]]
+        # Display only "Symbol", "Price (USDT)", and add "Last Updated" as a column
+        current_time = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        df["Last Updated"] = current_time
         
-        # Display last updated time
-        last_updated_time = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        last_updated_placeholder.markdown(f"**Last Updated:** {last_updated_time}")
-
         # Update the dataframe in the Streamlit app
         table_placeholder.dataframe(df, height=600)  # Updates the same box
 
