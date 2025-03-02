@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import time
+from datetime import datetime, timedelta
 
 # OKX API for all swap tickers
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
@@ -45,15 +46,23 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
+def convert_to_ist(utc_time):
+    """Convert UTC time to IST and format in 12-hour format with AM/PM."""
+    ist_time = utc_time + timedelta(hours=5, minutes=30)  # Convert UTC to IST
+    return ist_time.strftime("%I:%M:%S %p")  # Format in 12-hour with AM/PM
+
 # Create a single placeholder for dynamic updates
 table_placeholder = st.empty()
 
 while True:
     df = fetch_data()
     if not df.empty:
-        # Display only "Symbol", "Price (USDT)", and add "Last Updated" as a column
-        current_time = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        df["Last Updated"] = current_time
+        # Convert to 12-hour IST format for each row
+        current_ist_time = convert_to_ist(pd.Timestamp.utcnow())
+        df["Last Updated (IST)"] = current_ist_time
+        
+        # Display only "Symbol", "Price (USDT)", and "Last Updated"
+        df = df[["Symbol", "Price (USDT)", "Last Updated (IST)"]]
         
         # Update the dataframe in the Streamlit app
         table_placeholder.dataframe(df, height=600)  # Updates the same box
