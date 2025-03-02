@@ -46,11 +46,11 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-def calculate_changes(df):
-    """Calculate 5-minute and 15-minute price changes and their percentage differences."""
+def track_price_history(df):
+    """Track 5-minute and 15-minute prices."""
     current_time = pd.Timestamp.utcnow()
 
-    price_5m, change_5m, price_15m, change_15m, diff_5m_15m = [], [], [], [], []
+    price_5m, price_15m = [], []
 
     for index, row in df.iterrows():
         symbol = row["Symbol"]
@@ -61,61 +61,40 @@ def calculate_changes(df):
             st.session_state.prev_prices_5m[symbol] = current_price
             st.session_state.timestamps_5m[symbol] = current_time
             price_5m.append("-")
-            change_5m.append("-")
         else:
-            prev_price_5m = st.session_state.prev_prices_5m[symbol]
             prev_time_5m = st.session_state.timestamps_5m[symbol]
             time_diff_5m = (current_time - prev_time_5m).total_seconds() / 60  # Convert to minutes
 
             if time_diff_5m >= 5:
-                percent_change_5m = ((current_price - prev_price_5m) / prev_price_5m) * 100
-                change_5m.append(f"{percent_change_5m:.2f}%")
-                price_5m.append(prev_price_5m)
+                price_5m.append(st.session_state.prev_prices_5m[symbol])
                 st.session_state.prev_prices_5m[symbol] = current_price
                 st.session_state.timestamps_5m[symbol] = current_time
             else:
-                change_5m.append("-")
-                price_5m.append(prev_price_5m)
+                price_5m.append(st.session_state.prev_prices_5m[symbol])
 
         # Store & update 15-minute data
         if symbol not in st.session_state.prev_prices_15m:
             st.session_state.prev_prices_15m[symbol] = current_price
             st.session_state.timestamps_15m[symbol] = current_time
             price_15m.append("-")
-            change_15m.append("-")
-            diff_5m_15m.append("-")
         else:
-            prev_price_15m = st.session_state.prev_prices_15m[symbol]
             prev_time_15m = st.session_state.timestamps_15m[symbol]
             time_diff_15m = (current_time - prev_time_15m).total_seconds() / 60  # Convert to minutes
 
             if time_diff_15m >= 15:
-                percent_change_15m = ((current_price - prev_price_15m) / prev_price_15m) * 100
-                change_15m.append(f"{percent_change_15m:.2f}%")
-                price_15m.append(prev_price_15m)
+                price_15m.append(st.session_state.prev_prices_15m[symbol])
                 st.session_state.prev_prices_15m[symbol] = current_price
                 st.session_state.timestamps_15m[symbol] = current_time
             else:
-                change_15m.append("-")
-                price_15m.append(prev_price_15m)
-
-            # Calculate 5m-15m difference
-            if change_5m[-1] != "-" and change_15m[-1] != "-":
-                diff = float(change_5m[-1].strip('%')) - float(change_15m[-1].strip('%'))
-                diff_5m_15m.append(f"{diff:.2f}%")
-            else:
-                diff_5m_15m.append("-")
+                price_15m.append(st.session_state.prev_prices_15m[symbol])
 
     df["Price 5m Ago"] = price_5m
-    df["5m Change (%)"] = change_5m
     df["Price 15m Ago"] = price_15m
-    df["15m Change (%)"] = change_15m
-    df["5m-15m Diff (%)"] = diff_5m_15m
 
     return df
 
 # Sort options
-sort_col = st.selectbox("Sort by:", ["Price (USDT)", "5m Change (%)", "15m Change (%)", "5m-15m Diff (%)"], index=0)
+sort_col = st.selectbox("Sort by:", ["Price (USDT)", "Price 5m Ago", "Price 15m Ago"], index=0)
 sort_order = st.radio("Order:", ["Descending", "Ascending"], index=0)
 
 # Create a single placeholder for dynamic updates
@@ -124,7 +103,7 @@ table_placeholder = st.empty()
 while True:
     df = fetch_data()
     if not df.empty:
-        df = calculate_changes(df)
+        df = track_price_history(df)
 
         # Sort data based on selection
         df.replace("-", "0", inplace=True)  # Convert "-" to "0" for sorting
