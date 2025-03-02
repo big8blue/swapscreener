@@ -13,15 +13,24 @@ st.title("🚀 Real-Time Crypto Futures Screener (All Swaps)")
 if "prev_prices" not in st.session_state:
     st.session_state.prev_prices = {}
 
-@st.cache_data(ttl=10)  # Cache data for 10 seconds
+if "timestamps" not in st.session_state:
+    st.session_state.timestamps = {}
+
+@st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
     """Fetch all swap tickers from OKX API."""
     try:
         response = requests.get(API_URL)
         data = response.json().get("data", [])
-        df = pd.DataFrame(data)[["instId", "last"]]
-        df.columns = ["Symbol", "Price (USDT)"]
+        if not data:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(data)
+        df = df[["instId", "last", "ts"]]
+        df.columns = ["Symbol", "Price (USDT)", "Timestamp"]
         df["Price (USDT)"] = df["Price (USDT)"].astype(float)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
+        
         return df
     except Exception as e:
         st.error(f"Error fetching data: {e}")
@@ -29,28 +38,40 @@ def fetch_data():
 
 def calculate_5m_change(df):
     """Calculate 5-minute price change (%) for all swaps."""
+    current_time = pd.Timestamp.utcnow()
+    
     changes = []
     for index, row in df.iterrows():
         symbol = row["Symbol"]
         current_price = row["Price (USDT)"]
+        
+        # Store historical price if not available
+        if symbol not in st.session_state.prev_prices:
+            st.session_state.prev_prices[symbol] = current_price
+            st.session_state.timestamps[symbol] = current_time
+            changes.append("-")
+            continue
 
-        # Fetch stored previous price
-        prev_price = st.session_state.prev_prices.get(symbol, current_price)
+        # Check if 5 minutes have passed
+        prev_time = st.session_state.timestamps[symbol]
+        prev_price = st.session_state.prev_prices[symbol]
+        time_diff = (current_time - prev_time).total_seconds() / 60  # Convert to minutes
 
-        # Calculate percentage change
-        price_change = ((current_price - prev_price) / prev_price) * 100 if prev_price else 0
-        changes.append(f"{price_change:.2f}%")
-
-        # Update stored price for next cycle
-        st.session_state.prev_prices[symbol] = current_price
+        if time_diff >= 5:
+            price_change = ((current_price - prev_price) / prev_price) * 100
+            changes.append(f"{price_change:.2f}%")
+            st.session_state.prev_prices[symbol] = current_price  # Update price
+            st.session_state.timestamps[symbol] = current_time  # Update timestamp
+        else:
+            changes.append("-")
 
     df["5m Change (%)"] = changes
     return df
 
-st_autorefresh = st.empty()
-
 while True:
     df = fetch_data()
-    df = calculate_5m_change(df)
-    st_autorefresh.dataframe(df, height=600)
+    if not df.empty:
+        df = calculate_5m_change(df)
+        st.dataframe(df, height=600)
+
     time.sleep(1)  # Refresh every second
