@@ -68,10 +68,13 @@ def calculate_5m_change(df):
     df["5m Change (%)"] = changes
     return df
 
+# Create a single placeholder for dynamic updates
+table_placeholder = st.empty()
+
 while True:
     df = fetch_data()
     if not df.empty:
         df = calculate_5m_change(df)
-        st.dataframe(df, height=600)
+        table_placeholder.dataframe(df, height=600)  # Updates the same box
 
     time.sleep(1)  # Refresh every second
