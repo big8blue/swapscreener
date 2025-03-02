@@ -7,7 +7,7 @@ import time
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener (All Swaps)")
+st.title("🚀 Real-Time Crypto Futures Screener (USDT Swaps)")
 
 # Store historical prices for tracking changes
 if "prev_prices_5m" not in st.session_state:
@@ -24,7 +24,7 @@ if "timestamps_15m" not in st.session_state:
 
 @st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
-    """Fetch all swap tickers from OKX API."""
+    """Fetch all USDT swap tickers from OKX API."""
     try:
         response = requests.get(API_URL)
         data = response.json().get("data", [])
@@ -32,6 +32,10 @@ def fetch_data():
             return pd.DataFrame()
 
         df = pd.DataFrame(data)
+        
+        # Filter only USDT pairs
+        df = df[df["instId"].str.endswith("USDT-SWAP")]
+
         df = df[["instId", "last", "ts"]]
         df.columns = ["Symbol", "Price (USDT)", "Timestamp"]
         df["Price (USDT)"] = df["Price (USDT)"].astype(float)
