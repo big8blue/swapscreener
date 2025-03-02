@@ -3,8 +3,8 @@ import requests
 import pandas as pd
 import time
 
-# Binance API for futures market data (USDT pairs)
-API_URL = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+# CoinDCX API for futures market data (USDT pairs)
+API_URL = "https://api.coindcx.com/exchange/v1/market_data/futures"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
@@ -24,19 +24,21 @@ if "timestamps_15m" not in st.session_state:
 
 @st.cache_data(ttl=5)  # Cache data for 5 seconds to reduce API calls
 def fetch_data():
-    """Fetch all USDT futures tickers from Binance API."""
+    """Fetch all USDT futures tickers from CoinDCX API."""
     try:
         response = requests.get(API_URL)
         data = response.json()
-        if not data:
+        if not data.get("data"):
             return pd.DataFrame()
 
-        # Filter only USDT pairs
-        df = pd.DataFrame(data)
+        # Extract market data
+        df = pd.DataFrame(data["data"])
+        
+        # Filter only USDT pairs (CoinDCX typically uses symbols like BTC_USDT)
         df = df[df["symbol"].str.endswith("USDT")]
 
         # Extract necessary columns and rename them
-        df = df[["symbol", "lastPrice", "closeTime"]]
+        df = df[["symbol", "last_price", "open_time"]]
         df.columns = ["Symbol", "Price (USDT)", "Timestamp"]
 
         # Convert the price to float and timestamp to readable format
