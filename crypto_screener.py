@@ -4,7 +4,7 @@ import pandas as pd
 import time
 
 # CoinDCX API for active futures instruments
-API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
+API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 
 st.set_page_config(page_title="Crypto Futures Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener (USDT Futures)")
