@@ -54,7 +54,7 @@ def generate_signal(df):
 
             # Check if 5 minutes have passed
             time_diff = (current_time - prev_time).total_seconds() / 60
-            if time_diff >= 5:
+            if time_diff >= 1:
                 prev_price = prev_entry["Price"]
                 prev_volume = prev_entry["Volume"]
 
