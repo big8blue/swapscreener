@@ -4,8 +4,9 @@ import pandas as pd
 import time
 from datetime import datetime, timedelta
 
-# OKX API for all swap tickers
-API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
+# OKX API for market data
+TICKERS_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
+CANDLES_URL = "https://www.okx.com/api/v5/market/candles"
 
 # Set Page Configuration
 st.set_page_config(page_title="Crypto Screener", layout="wide")
@@ -17,7 +18,7 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
-        response = requests.get(API_URL)
+        response = requests.get(TICKERS_URL)
         data = response.json().get("data", [])
         if not data:
             return pd.DataFrame()
@@ -71,24 +72,37 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Engulfing Candle Analysis (Dummy)
+# Fetch historical candles & detect engulfing pattern
 def check_engulfing_candle(symbol):
-    """Simulated Engulfing Candle Detection."""
-    recent_candles = [
-        {"open": 100, "close": 105},  # 1H
-        {"open": 105, "close": 110},  # 4H
-        {"open": 98, "close": 115},   # 1D
-        {"open": 90, "close": 120}    # 1W
-    ]
-    
+    """Fetch real candlestick data & detect engulfing patterns."""
+    timeframes = {"1H": "3600", "4H": "14400", "1D": "86400", "1W": "604800"}
     signals = []
-    for timeframe, candle in zip(["1H", "4H", "1D", "1W"], recent_candles):
-        if candle["close"] > candle["open"]:
-            signals.append(f"{timeframe}: 🟢 Bullish")
-        elif candle["close"] < candle["open"]:
-            signals.append(f"{timeframe}: 🔴 Bearish")
-        else:
-            signals.append(f"{timeframe}: ⚪ Neutral")
+    
+    for tf, tf_sec in timeframes.items():
+        url = f"{CANDLES_URL}?instId={symbol}&bar={tf_sec}&limit=2"
+        try:
+            response = requests.get(url)
+            data = response.json().get("data", [])
+            if len(data) < 2:
+                signals.append(f"{tf}: ⚪ No Data")
+                continue
+            
+            prev_candle = data[1]  # Previous candle
+            curr_candle = data[0]  # Current candle
+
+            prev_open, prev_close = float(prev_candle[1]), float(prev_candle[4])
+            curr_open, curr_close = float(curr_candle[1]), float(curr_candle[4])
+
+            # Bullish Engulfing: Current green candle completely engulfs previous red candle
+            if curr_open < prev_close and curr_close > prev_open:
+                signals.append(f"{tf}: 🟢 Bullish Engulfing")
+            # Bearish Engulfing: Current red candle completely engulfs previous green candle
+            elif curr_open > prev_close and curr_close < prev_open:
+                signals.append(f"{tf}: 🔴 Bearish Engulfing")
+            else:
+                signals.append(f"{tf}: ⚪ Neutral")
+        except:
+            signals.append(f"{tf}: ⚪ Error")
 
     return ", ".join(signals)
 
