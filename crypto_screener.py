@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
 
 # OKX API for all swap tickers
@@ -12,8 +11,11 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
 
-# Caching API Calls (refreshes every 2 seconds)
-@st.cache_data(ttl=2)
+# User-defined refresh interval
+refresh_rate = st.sidebar.slider("Refresh rate (seconds)", 1, 10, 2)
+
+# Fetch Data Function (Cached for 2 Seconds)
+@st.cache_data(ttl=refresh_rate)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
@@ -45,25 +47,18 @@ def track_volume(df):
         symbol = row["Symbol"]
         current_volume = row["Volume"]
 
-        if symbol in st.session_state.prev_volumes:
-            prev_volume = st.session_state.prev_volumes[symbol]
-            if current_volume > prev_volume:
-                trend = "🔼 Increasing"
-                color = "green"
-            elif current_volume < prev_volume:
-                trend = "🔽 Decreasing"
-                color = "red"
-            else:
-                trend = "➡ Stable"
-                color = "gray"
+        prev_volume = st.session_state.prev_volumes.get(symbol, 0)
+        if current_volume > prev_volume:
+            trend = "🔼 Increasing"
+        elif current_volume < prev_volume:
+            trend = "🔽 Decreasing"
         else:
-            trend = "🆕 New"
-            color = "blue"
+            trend = "➡ Stable"
 
         st.session_state.prev_volumes[symbol] = current_volume
-        filtered_data.append((symbol, row["Price"], current_volume, trend, row["Timestamp"], color))
+        filtered_data.append((symbol, row["Price"], current_volume, trend, row["Timestamp"]))
 
-    df_filtered = pd.DataFrame(filtered_data, columns=["Symbol", "Price", "Volume", "Trend", "Timestamp", "Color"])
+    df_filtered = pd.DataFrame(filtered_data, columns=["Symbol", "Price", "Volume", "Trend", "Timestamp"])
     return df_filtered
 
 # Convert UTC to IST
@@ -92,21 +87,16 @@ def check_engulfing_candle(symbol):
 
     return ", ".join(signals)
 
-# Live Updates Without Glitches
-placeholder = st.empty()
+# Fetch and process data
+df = fetch_data()
+if not df.empty:
+    df_filtered = track_volume(df)
+    df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
+    df_filtered = df_filtered.drop(columns=["Timestamp"])
+    df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
 
-while True:
-    df = fetch_data()
-    if not df.empty:
-        df_filtered = track_volume(df)
-        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-        df_filtered = df_filtered.drop(columns=["Timestamp"])
-        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
+    # Display Data
+    st.dataframe(df_filtered, height=600)
 
-        # Display Data
-        with placeholder.container():
-            st.dataframe(df_filtered, height=600)
-
-    time.sleep(1)  # Refresh every 1 second
-
-
+# Auto-refresh the app
+st.experimental_rerun()
