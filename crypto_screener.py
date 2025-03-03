@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
 
 # OKX API for all swap tickers
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
@@ -12,12 +13,7 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
 
 # Auto-refresh every second
-st_autorefresh = st.empty()
-st_autorefresh.text("Updating every second...")
-
-# Auto-refresh mechanism
-st_autorefresh = st.experimental_data_editor("⏳ Auto-refreshing every second...", key="autorefresh")
-st_autorefresh.write("Updated ✅")
+st_autorefresh(interval=1000, limit=None)
 
 # Caching API Calls (refreshes every 2 seconds)
 @st.cache_data(ttl=2)
@@ -100,23 +96,16 @@ def check_engulfing_candle(symbol):
     return ", ".join(signals)
 
 # Live Updates
-data_container = st.empty()
+df = fetch_data()
+if not df.empty:
+    df_filtered = track_volume(df)
+    df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
+    df_filtered = df_filtered.drop(columns=["Timestamp"])
+    df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
 
-def update_data():
-    df = fetch_data()
-    if not df.empty:
-        df_filtered = track_volume(df)
-        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-        df_filtered = df_filtered.drop(columns=["Timestamp"])
-        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
+    # Apply Color Formatting
+    def highlight_trend(row):
+        return ["background-color: " + row["Color"]] * len(row)
 
-        # Apply Color Formatting
-        def highlight_trend(row):
-            return ["background-color: " + row["Color"]] * len(row)
-
-        # Display Data
-        data_container.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
-
-# Auto-refresh every second
-st_autorefresh = st.experimental_data_editor("Updating...", key="autorefresh")
-update_data()
+    # Display Data
+    st.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
