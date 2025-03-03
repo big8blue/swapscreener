@@ -45,6 +45,7 @@ def generate_signal(df):
         symbol = row["Symbol"]
         current_price = row["Price"]
         current_volume = row["Volume"]
+        current_timestamp = row["Timestamp"]
 
         # Check if we have past data stored
         if symbol in st.session_state.historical_data:
@@ -77,23 +78,29 @@ def generate_signal(df):
                     "Price": current_price,
                     "Volume": current_volume,
                     "Timestamp": current_time,
+                    "Signal": signal
                 }
             else:
-                signal = st.session_state.historical_data[symbol].get("Signal", "WAIT ⏳")
+                signal = prev_entry.get("Signal", "WAIT ⏳")
         else:
             # First time storing data for this symbol
             st.session_state.historical_data[symbol] = {
                 "Price": current_price,
                 "Volume": current_volume,
                 "Timestamp": current_time,
-                "Signal": "WAIT ⏳",
+                "Signal": "WAIT ⏳"
             }
             signal = "WAIT ⏳"  # No historical data yet
 
         st.session_state.historical_data[symbol]["Signal"] = signal
-        signals.append((symbol, current_price, current_volume, signal))
+        signals.append((symbol, current_price, current_volume, signal, current_timestamp))
 
-    return pd.DataFrame(signals, columns=["Symbol", "Price", "Volume", "Signal"])
+    return pd.DataFrame(signals, columns=["Symbol", "Price", "Volume", "Signal", "Updated Time"])
+
+# Convert UTC to IST
+def convert_to_ist(utc_time):
+    ist_time = utc_time + timedelta(hours=5, minutes=30)
+    return ist_time.strftime("%I:%M:%S %p")
 
 # Live Updates Without Glitches
 placeholder = st.empty()
@@ -102,6 +109,8 @@ while True:
     df = fetch_data()
     if not df.empty:
         df_signals = generate_signal(df)
+        df_signals["Updated Time (IST)"] = df_signals["Updated Time"].apply(convert_to_ist)
+        df_signals = df_signals.drop(columns=["Updated Time"])
 
         # Display Data
         with placeholder.container():
