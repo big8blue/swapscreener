@@ -32,32 +32,35 @@ def fetch_data():
     except:
         return pd.DataFrame()
 
-# Store previous data for signal analysis
-if "prev_data" not in st.session_state:
-    st.session_state.prev_data = {}
+# Store previous data only every 5 minutes
+if "historical_data" not in st.session_state:
+    st.session_state.historical_data = {}
 
 def generate_signal(df):
     """Generate buy/sell/neutral signals based on price and volume changes over 5 minutes."""
     signals = []
+    current_time = datetime.utcnow()
 
     for _, row in df.iterrows():
         symbol = row["Symbol"]
         current_price = row["Price"]
         current_volume = row["Volume"]
-        current_time = row["Timestamp"]
 
-        if symbol in st.session_state.prev_data:
-            prev_entry = st.session_state.prev_data[symbol]
-            prev_price = prev_entry["Price"]
-            prev_volume = prev_entry["Volume"]
+        # Check if we have past data stored
+        if symbol in st.session_state.historical_data:
+            prev_entry = st.session_state.historical_data[symbol]
             prev_time = prev_entry["Timestamp"]
 
-            # Ensure a 5-minute difference
+            # Ensure at least 5 minutes have passed
             if (current_time - prev_time).total_seconds() >= 300:
+                prev_price = prev_entry["Price"]
+                prev_volume = prev_entry["Volume"]
+
+                # Calculate % change
                 price_change = ((current_price - prev_price) / prev_price) * 100
                 volume_change = ((current_volume - prev_volume) / prev_volume) * 100
 
-                # Define thresholds for signals
+                # Define thresholds
                 price_threshold = 1.0  # 1% price change
                 volume_threshold = 5.0  # 5% volume change
 
@@ -67,20 +70,27 @@ def generate_signal(df):
                     signal = "SELL 📉"
                 else:
                     signal = "NEUTRAL ⚖"
+
+                # Update stored data every 5 minutes
+                st.session_state.historical_data[symbol] = {
+                    "Price": current_price,
+                    "Volume": current_volume,
+                    "Timestamp": current_time,
+                }
             else:
-                signal = "WAIT ⏳"  # Waiting for 5-minute data
+                signal = "WAIT ⏳"  # Still waiting for 5-minute difference
         else:
-            signal = "WAIT ⏳"  # First entry, need history
+            # First time storing data for this symbol
+            st.session_state.historical_data[symbol] = {
+                "Price": current_price,
+                "Volume": current_volume,
+                "Timestamp": current_time,
+            }
+            signal = "WAIT ⏳"  # No historical data yet
 
-        # Store current data
-        st.session_state.prev_data[symbol] = {"Price": current_price, "Volume": current_volume, "Timestamp": current_time}
-        signals.append((symbol, current_price, current_volume, signal, current_time))
+        signals.append((symbol, current_price, current_volume, signal))
 
-    return pd.DataFrame(signals, columns=["Symbol", "Price", "Volume", "Signal", "Timestamp"])
-
-# Convert UTC to IST
-def convert_to_ist(utc_time):
-    return (utc_time + timedelta(hours=5, minutes=30)).strftime("%I:%M:%S %p")
+    return pd.DataFrame(signals, columns=["Symbol", "Price", "Volume", "Signal"])
 
 # Live Updates Without Glitches
 placeholder = st.empty()
@@ -89,8 +99,6 @@ while True:
     df = fetch_data()
     if not df.empty:
         df_signals = generate_signal(df)
-        df_signals["Timestamp (IST)"] = df_signals["Timestamp"].apply(convert_to_ist)
-        df_signals.drop(columns=["Timestamp"], inplace=True)
 
         # Display Data
         with placeholder.container():
