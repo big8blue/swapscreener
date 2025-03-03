@@ -14,7 +14,11 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 
 # Sidebar Filters
 st.sidebar.header("🔍 Filters")
-min_volume = st.sidebar.slider("Min Volume (24h)", min_value=0, max_value=100000000, value=500000, step=50000)
+min_volume, max_volume = st.sidebar.slider("Volume Range (24h)", 
+                                           min_value=0, 
+                                           max_value=100000000, 
+                                           value=(500000, 50000000), 
+                                           step=50000)
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
 # Caching API Calls (refreshes every X seconds)
@@ -55,7 +59,9 @@ def update_data():
     if not df.empty:
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
         df = df.drop(columns=["Timestamp"])
-        df = df[df["Volume"] >= min_volume]  # Apply volume filter
+
+        # Apply min & max volume filter
+        df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
 
         # Display Data
         with placeholder.container():
