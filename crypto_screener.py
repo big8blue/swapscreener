@@ -26,7 +26,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🚀 Crypto Futures Screener")
+st.title("🚀 dora Crypto Futures Screener")
 
 # Cache API Calls
 @st.cache_data(ttl=5)
