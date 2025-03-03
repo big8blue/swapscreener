@@ -32,7 +32,7 @@ def fetch_data():
     except:
         return pd.DataFrame()
 
-# Store previous data only every 5 minutes
+# Store past data with timestamps
 if "historical_data" not in st.session_state:
     st.session_state.historical_data = {}
 
@@ -51,8 +51,9 @@ def generate_signal(df):
             prev_entry = st.session_state.historical_data[symbol]
             prev_time = prev_entry["Timestamp"]
 
-            # Ensure at least 5 minutes have passed
-            if (current_time - prev_time).total_seconds() >= 300:
+            # Check if 5 minutes have passed
+            time_diff = (current_time - prev_time).total_seconds() / 60
+            if time_diff >= 5:
                 prev_price = prev_entry["Price"]
                 prev_volume = prev_entry["Volume"]
 
@@ -71,23 +72,25 @@ def generate_signal(df):
                 else:
                     signal = "NEUTRAL ⚖"
 
-                # Update stored data every 5 minutes
+                # Update stored data
                 st.session_state.historical_data[symbol] = {
                     "Price": current_price,
                     "Volume": current_volume,
                     "Timestamp": current_time,
                 }
             else:
-                signal = "WAIT ⏳"  # Still waiting for 5-minute difference
+                signal = st.session_state.historical_data[symbol].get("Signal", "WAIT ⏳")
         else:
             # First time storing data for this symbol
             st.session_state.historical_data[symbol] = {
                 "Price": current_price,
                 "Volume": current_volume,
                 "Timestamp": current_time,
+                "Signal": "WAIT ⏳",
             }
             signal = "WAIT ⏳"  # No historical data yet
 
+        st.session_state.historical_data[symbol]["Signal"] = signal
         signals.append((symbol, current_price, current_volume, signal))
 
     return pd.DataFrame(signals, columns=["Symbol", "Price", "Volume", "Signal"])
