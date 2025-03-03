@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 from datetime import datetime, timedelta
 
 # OKX API URLs
@@ -12,12 +13,12 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
 
-# Caching API Calls (refreshes every 1 second)
-@st.cache_data(ttl=1)
+# Caching API Calls (refreshes every 5 seconds)
+@st.cache_data(ttl=5)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
-        response = requests.get(TICKERS_URL)
+        response = requests.get(TICKERS_URL, timeout=5)
         data = response.json().get("data", [])
         if not data:
             return pd.DataFrame()
@@ -71,57 +72,65 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Fetch historical candles & detect engulfing pattern
+# Fetch historical candles & detect engulfing pattern (only for displayed symbols)
 @st.cache_data(ttl=60)
-def check_engulfing_candle(symbol):
-    """Fetch real candlestick data & detect engulfing patterns."""
+def check_engulfing_candle(symbols):
+    """Fetch real candlestick data & detect engulfing patterns for multiple symbols."""
     timeframes = {"1H": "60m", "4H": "240m", "1D": "1D", "1W": "1W"}
-    signals = []
-    
-    for tf, okx_tf in timeframes.items():
-        url = f"{CANDLES_URL}?instId={symbol}&bar={okx_tf}&limit=2"
-        try:
-            response = requests.get(url)
-            data = response.json().get("data", [])
-            if len(data) < 2:
-                signals.append(f"{tf}: ⚪ No Data")
-                continue
-            
-            prev_candle = data[1]  # Previous candle
-            curr_candle = data[0]  # Current candle
+    signals_dict = {}
 
-            prev_open, prev_close = float(prev_candle[1]), float(prev_candle[4])
-            curr_open, curr_close = float(curr_candle[1]), float(curr_candle[4])
+    for symbol in symbols:
+        signals = []
+        for tf, okx_tf in timeframes.items():
+            url = f"{CANDLES_URL}?instId={symbol}&bar={okx_tf}&limit=2"
+            try:
+                response = requests.get(url, timeout=3)
+                data = response.json().get("data", [])
+                if len(data) < 2:
+                    signals.append(f"{tf}: ⚪ No Data")
+                    continue
 
-            # Bullish Engulfing: Current green candle engulfs previous red candle
-            if curr_open < prev_close and curr_close > prev_open:
-                signals.append(f"{tf}: 🟢 Bullish")
-            # Bearish Engulfing: Current red candle engulfs previous green candle
-            elif curr_open > prev_close and curr_close < prev_open:
-                signals.append(f"{tf}: 🔴 Bearish")
-            else:
-                signals.append(f"{tf}: ⚪ Neutral")
-        except:
-            signals.append(f"{tf}: ⚪ Error")
+                prev_candle = data[1]  # Previous candle
+                curr_candle = data[0]  # Current candle
 
-    return ", ".join(signals)
+                prev_open, prev_close = float(prev_candle[1]), float(prev_candle[4])
+                curr_open, curr_close = float(curr_candle[1]), float(curr_candle[4])
+
+                # Bullish Engulfing: Current green candle engulfs previous red candle
+                if curr_open < prev_close and curr_close > prev_open:
+                    signals.append(f"{tf}: 🟢 Bullish")
+                # Bearish Engulfing: Current red candle engulfs previous green candle
+                elif curr_open > prev_close and curr_close < prev_open:
+                    signals.append(f"{tf}: 🔴 Bearish")
+                else:
+                    signals.append(f"{tf}: ⚪ Neutral")
+            except:
+                signals.append(f"{tf}: ⚪ Error")
+
+        signals_dict[symbol] = ", ".join(signals)
+
+    return signals_dict
 
 # Live Data Display
 placeholder = st.empty()
 
 def update_display():
-    """Updates the displayed data every second."""
+    """Updates the displayed data every 5 seconds."""
     df = fetch_data()
     if not df.empty:
         df_filtered = track_volume(df)
         df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
         df_filtered = df_filtered.drop(columns=["Timestamp"])
-        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
+
+        # Fetch engulfing signals only for displayed symbols
+        displayed_symbols = df_filtered["Symbol"].tolist()
+        engulfing_signals = check_engulfing_candle(displayed_symbols)
+        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].map(engulfing_signals)
 
         with placeholder.container():
             st.dataframe(df_filtered, height=600)
 
-# Run Auto-Refresh
-while True:
-    update_display()
-    time.sleep(1)  # Refresh every second
+# Auto-refresh every 5 seconds
+st_autorefresh(interval=5000, key="data_refresh")
+
+update_display()
