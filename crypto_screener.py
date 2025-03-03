@@ -12,7 +12,11 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
 
-# Caching API Calls (Short TTL for near real-time)
+# Auto-refresh every second
+st_autorefresh = st.empty()
+st_autorefresh.text("Updating every second...")
+
+# Caching API Calls
 @st.cache_data(ttl=2)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
@@ -34,7 +38,7 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-# Volume Trend Tracking
+# Track Volume Trends
 if "prev_volumes" not in st.session_state:
     st.session_state.prev_volumes = {}
 
@@ -92,10 +96,10 @@ def check_engulfing_candle(symbol):
 
     return ", ".join(signals)
 
-# Real-Time Table
-placeholder = st.empty()  # Placeholder for real-time updates
+# Live Updates
+data_container = st.empty()
 
-while True:
+def update_data():
     df = fetch_data()
     if not df.empty:
         df_filtered = track_volume(df)
@@ -108,15 +112,9 @@ while True:
             return ["background-color: " + row["Color"]] * len(row)
 
         # Display Data
-        placeholder.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
+        data_container.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
 
-        # TradingView Chart
-        selected_ticker = st.selectbox("Select a Symbol to View Chart", df_filtered["Symbol"].unique(), key="chart")
-        if selected_ticker:
-            st.markdown(f"""
-            <iframe src="https://www.tradingview.com/chart/?symbol=OKX:{selected_ticker.replace('-SWAP', '')}"
-            width="100%" height="500" frameborder="0"></iframe>
-            """, unsafe_allow_html=True)
-
-    time.sleep(1)  # Refresh every 1 second
-    st.rerun()
+# Update Data Every Second
+update_data()
+time.sleep(1)  # Wait 1 second before next refresh
+st.experimental_rerun()
