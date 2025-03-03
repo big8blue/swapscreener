@@ -14,7 +14,7 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 # User-defined refresh interval
 refresh_rate = st.sidebar.slider("Refresh rate (seconds)", 1, 10, 2)
 
-# Fetch Data Function (Cached for 2 Seconds)
+# Fetch Data Function (Cached for Performance)
 @st.cache_data(ttl=refresh_rate)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
@@ -66,34 +66,12 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Engulfing Candle Analysis (Dummy)
-def check_engulfing_candle(symbol):
-    """Simulated Engulfing Candle Detection."""
-    recent_candles = [
-        {"open": 100, "close": 105},  # 1H
-        {"open": 105, "close": 110},  # 4H
-        {"open": 98, "close": 115},   # 1D
-        {"open": 90, "close": 120}    # 1W
-    ]
-    
-    signals = []
-    for timeframe, candle in zip(["1H", "4H", "1D", "1W"], recent_candles):
-        if candle["close"] > candle["open"]:
-            signals.append(f"{timeframe}: 🟢 Bullish")
-        elif candle["close"] < candle["open"]:
-            signals.append(f"{timeframe}: 🔴 Bearish")
-        else:
-            signals.append(f"{timeframe}: ⚪ Neutral")
-
-    return ", ".join(signals)
-
 # Fetch and process data
 df = fetch_data()
 if not df.empty:
     df_filtered = track_volume(df)
     df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
     df_filtered = df_filtered.drop(columns=["Timestamp"])
-    df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
 
     # Display Data
     st.dataframe(df_filtered, height=600)
