@@ -17,7 +17,7 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
-        response = requests.get(API_URL, timeout=5)
+        response = requests.get(API_URL)
         data = response.json().get("data", [])
         if not data:
             return pd.DataFrame()
@@ -34,28 +34,17 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-# Fetch 5-minute historical data for price & volume comparison
+# Store Historical Data for 5-Minute Signal Calculation
+if "historical_data" not in st.session_state:
+    st.session_state.historical_data = {}
+
 def get_previous_data(symbol):
-    """Fetch historical data from OKX API to compare with current values."""
-    try:
-        history_url = f"https://www.okx.com/api/v5/market/candles?instId={symbol}&bar=1m&limit=5"
-        response = requests.get(history_url, timeout=5)
-        response.raise_for_status()
-        candles = response.json().get("data", [])
+    """Retrieve stored historical data for a given symbol."""
+    if symbol in st.session_state.historical_data:
+        prev_entry = st.session_state.historical_data[symbol]
+        return prev_entry["Price"], prev_entry["Volume"]
+    return None
 
-        if not candles or len(candles) < 5:
-            return None  # Not enough data
-
-        # Use the oldest candle (5 min ago)
-        prev_close = float(candles[-1][4])  # Closing price 5 min ago
-        prev_volume = float(candles[-1][5])  # Volume 5 min ago
-
-        return prev_close, prev_volume
-    except Exception as e:
-        st.warning(f"Error fetching historical data for {symbol}: {e}")
-        return None
-
-# Generate Buy/Sell/Neutral signals
 def generate_signal(df):
     """Generate buy/sell/neutral signals based on price and volume changes over 5 minutes."""
     signals = []
@@ -72,9 +61,11 @@ def generate_signal(df):
         if historical_data:
             prev_price, prev_volume = historical_data
 
-            # Calculate % change
-            price_change = ((current_price - prev_price) / prev_price) * 100
-            volume_change = ((current_volume - prev_volume) / prev_volume) * 100
+            # Calculate % price change
+            price_change = ((current_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0
+
+            # Calculate % volume change (avoid division by zero)
+            volume_change = ((current_volume - prev_volume) / prev_volume) * 100 if prev_volume != 0 else 0
 
             # Define thresholds
             price_threshold = 1.0  # 1% price change
@@ -88,6 +79,13 @@ def generate_signal(df):
                 signal = "NEUTRAL ⚖"
         else:
             signal = "WAIT ⏳"  # Not enough historical data
+
+        # Store new data
+        st.session_state.historical_data[symbol] = {
+            "Price": current_price,
+            "Volume": current_volume,
+            "Timestamp": current_time
+        }
 
         signals.append((symbol, current_price, current_volume, signal, current_timestamp))
 
