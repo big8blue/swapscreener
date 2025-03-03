@@ -19,14 +19,14 @@ st.sidebar.header("🔍 Filters")
 st.sidebar.subheader("📊 Volume Range (24h)")
 
 col1, col2 = st.sidebar.columns(2)
-min_volume_input = col1.number_input("Min Volume", min_value=0, max_value=100000000, value=500000, step=50000)
-max_volume_input = col2.number_input("Max Volume", min_value=0, max_value=100000000, value=50000000, step=50000)
+min_volume_input = col1.number_input("Min Volume", min_value=0, max_value=100000000000000, value=500000, step=50000)
+max_volume_input = col2.number_input("Max Volume", min_value=0, max_value=100000000000000, value=50000000, step=50000)
 
 # Slider for convenience
 min_volume, max_volume = st.sidebar.slider(
     "Or use the slider below",
     min_value=0,
-    max_value=100000000,
+    max_value=100000000000000,
     value=(min_volume_input, max_volume_input),
     step=50000
 )
