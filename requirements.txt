@@ -4,3 +4,4 @@ requests
 pandas_ta
 setuptools
 ta
+aiohttp
