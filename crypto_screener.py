@@ -34,34 +34,6 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-# Track Volume Trends
-if "prev_volumes" not in st.session_state:
-    st.session_state.prev_volumes = {}
-
-def track_volume(df):
-    """Filter tickers with a consistent increase or decrease in volume."""
-    filtered_data = []
-    for _, row in df.iterrows():
-        symbol = row["Symbol"]
-        current_volume = row["Volume"]
-
-        if symbol in st.session_state.prev_volumes:
-            prev_volume = st.session_state.prev_volumes[symbol]
-            if current_volume > prev_volume:
-                trend = "🔼 Increasing"
-            elif current_volume < prev_volume:
-                trend = "🔽 Decreasing"
-            else:
-                trend = "➡ Stable"
-        else:
-            trend = "🆕 New"
-
-        st.session_state.prev_volumes[symbol] = current_volume
-        filtered_data.append((symbol, row["Price"], current_volume, trend, row["Timestamp"]))
-
-    df_filtered = pd.DataFrame(filtered_data, columns=["Symbol", "Price", "Volume", "Trend", "Timestamp"])
-    return df_filtered
-
 # Convert UTC to IST
 def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
@@ -73,14 +45,11 @@ placeholder = st.empty()
 while True:
     df = fetch_data()
     if not df.empty:
-        df_filtered = track_volume(df)
-        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-        df_filtered = df_filtered.drop(columns=["Timestamp"])
+        df["Timestamp (IST)"] = df["Timestamp"].apply(convert_to_ist)
+        df = df.drop(columns=["Timestamp"])
 
         # Display Data
         with placeholder.container():
-            st.dataframe(df_filtered, height=600)
+            st.dataframe(df, height=600)
 
     time.sleep(1)  # Refresh every 1 second
-
-
