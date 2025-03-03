@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 
 # Set Page Configuration
-st.set_page_config(page_title="Crypto Screener with Trade Signals", layout="wide")
+st.set_page_config(page_title="Crypto Screener", layout="wide")
 
-st.title("🚀 Real-Time Crypto Futures Screener with Trade Signals")
+st.title("🚀 Real-Time Crypto Futures Screener")
 
 # Sidebar Filters
 st.sidebar.header("🔍 Filters")
@@ -33,11 +33,6 @@ min_volume, max_volume = st.sidebar.slider(
 
 # Refresh Rate
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
-
-# RSI & EMA Settings
-st.sidebar.subheader("📈 Indicator Settings")
-rsi_period = st.sidebar.slider("RSI Period", 7, 21, 14)
-ema_period = st.sidebar.slider("EMA Period", 7, 50, 21)
 
 # Caching API Calls (refreshes every X seconds)
 @st.cache_data(ttl=refresh_rate)
@@ -69,18 +64,14 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Generate Trade Signals
-def generate_signals(df):
-    """Generate BUY/SELL signals based on RSI and EMA."""
-    df["RSI"] = ta.momentum.RSIIndicator(df["Price"], window=rsi_period).rsi()
-    df["EMA"] = ta.trend.EMAIndicator(df["Price"], window=ema_period).ema_indicator()
-
-    # Define Buy and Sell Signals
-    df["Signal"] = "⚫ HOLD"  # Default to hold
-    df.loc[(df["RSI"] < 30) & (df["Price"] > df["EMA"]), "Signal"] = "🟢 BUY"
-    df.loc[(df["RSI"] > 70) & (df["Price"] < df["EMA"]), "Signal"] = "🔴 SELL"
-
-    return df
+# Format Volume (in K/M)
+def format_volume(volume):
+    if volume >= 1_000_000:
+        return f"{volume / 1_000_000:.2f}M"
+    elif volume >= 1_000:
+        return f"{volume / 1_000:.2f}K"
+    else:
+        return str(volume)
 
 # Live Updates with Auto Refresh
 placeholder = st.empty()
@@ -94,12 +85,12 @@ def update_data():
         # Apply min & max volume filter
         df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
 
-        # Generate Signals
-        df = generate_signals(df)
+        # Format Volume Column
+        df["Volume"] = df["Volume"].apply(format_volume)
 
         # Display Data
         with placeholder.container():
-            st.dataframe(df.sort_values(by=["Signal", "Volume"], ascending=[True, False]), height=600)
+            st.dataframe(df.sort_values(by=["Volume"], ascending=False), height=600)
 
 while True:
     update_data()
