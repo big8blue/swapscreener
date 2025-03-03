@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 from datetime import datetime, timedelta
 
 # OKX API for all swap tickers
@@ -11,11 +12,8 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
 
-# User-defined refresh interval
-refresh_rate = st.sidebar.slider("Refresh rate (seconds)", 1, 10, 2)
-
-# Fetch Data Function (Cached for Performance)
-@st.cache_data(ttl=refresh_rate)
+# Caching API Calls (refreshes every 2 seconds)
+@st.cache_data(ttl=2)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
@@ -47,13 +45,16 @@ def track_volume(df):
         symbol = row["Symbol"]
         current_volume = row["Volume"]
 
-        prev_volume = st.session_state.prev_volumes.get(symbol, 0)
-        if current_volume > prev_volume:
-            trend = "🔼 Increasing"
-        elif current_volume < prev_volume:
-            trend = "🔽 Decreasing"
+        if symbol in st.session_state.prev_volumes:
+            prev_volume = st.session_state.prev_volumes[symbol]
+            if current_volume > prev_volume:
+                trend = "🔼 Increasing"
+            elif current_volume < prev_volume:
+                trend = "🔽 Decreasing"
+            else:
+                trend = "➡ Stable"
         else:
-            trend = "➡ Stable"
+            trend = "🆕 New"
 
         st.session_state.prev_volumes[symbol] = current_volume
         filtered_data.append((symbol, row["Price"], current_volume, trend, row["Timestamp"]))
@@ -66,15 +67,18 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Fetch and process data
-df = fetch_data()
-if not df.empty:
-    df_filtered = track_volume(df)
-    df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-    df_filtered = df_filtered.drop(columns=["Timestamp"])
+# Live Updates Without Glitches
+placeholder = st.empty()
 
-    # Display Data
-    st.dataframe(df_filtered, height=600)
+while True:
+    df = fetch_data()
+    if not df.empty:
+        df_filtered = track_volume(df)
+        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
+        df_filtered = df_filtered.drop(columns=["Timestamp"])
 
-# Auto-refresh the app
-st.experimental_rerun()
+        # Display Data
+        with placeholder.container():
+            st.dataframe(df_filtered, height=600)
+
+    time.sleep(1)  # Refresh every 1 second
