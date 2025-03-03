@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 from datetime import datetime, timedelta
-from streamlit_autorefresh import st_autorefresh
 
 # OKX API for all swap tickers
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
@@ -11,9 +11,6 @@ API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
-
-# Auto-refresh every second
-st_autorefresh(interval=1000, limit=None)
 
 # Caching API Calls (refreshes every 2 seconds)
 @st.cache_data(ttl=2)
@@ -95,17 +92,19 @@ def check_engulfing_candle(symbol):
 
     return ", ".join(signals)
 
-# Live Updates
-df = fetch_data()
-if not df.empty:
-    df_filtered = track_volume(df)
-    df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
-    df_filtered = df_filtered.drop(columns=["Timestamp"])
-    df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
+# Live Updates Without Glitches
+placeholder = st.empty()
 
-    # Apply Color Formatting
-    def highlight_trend(row):
-        return ["background-color: " + row["Color"]] * len(row)
+while True:
+    df = fetch_data()
+    if not df.empty:
+        df_filtered = track_volume(df)
+        df_filtered["Timestamp (IST)"] = df_filtered["Timestamp"].apply(convert_to_ist)
+        df_filtered = df_filtered.drop(columns=["Timestamp"])
+        df_filtered["Engulfing Signal"] = df_filtered["Symbol"].apply(check_engulfing_candle)
 
-    # Display Data
-    st.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
+        # Display Data
+        with placeholder.container():
+            st.dataframe(df_filtered, height=600)
+
+    time.sleep(1)  # Refresh every 1 second
