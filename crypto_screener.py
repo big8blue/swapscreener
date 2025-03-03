@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import pandas_ta as ta
 import time
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
@@ -66,15 +65,21 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Calculate RSI and EMA
-def calculate_indicators(df):
-    df["EMA"] = df["Price"].ewm(span=20, adjust=False).mean()
-    df["RSI"] = ta.rsi(df["Price"], length=14)
-    return df
+# Calculate RSI (Without External Libraries)
+def calculate_rsi(series, period=14):
+    delta = series.diff(1)
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+# Calculate EMA
+def calculate_ema(series, span=20):
+    return series.ewm(span=span, adjust=False).mean()
 
 # Detect Volume Spikes
 def detect_volume_spikes(df):
-    df["Volume MA"] = df["Volume"].rolling(window=20).mean()
+    df["Volume MA"] = df["Volume"].rolling(window=20, min_periods=1).mean()
     df["Volume Spike"] = df["Volume"] > 1.5 * df["Volume MA"]
     return df
 
@@ -95,7 +100,8 @@ if not df.empty:
     df = df[df["Volume"] >= min_volume]  # Apply volume filter
 
     # Calculate indicators
-    df = calculate_indicators(df)
+    df["EMA"] = calculate_ema(df["Price"])
+    df["RSI"] = calculate_rsi(df["Price"])
     df = detect_volume_spikes(df)
 
     # Trigger Alerts
@@ -112,4 +118,3 @@ if not df.empty:
     st.dataframe(df.sort_values(by="Volume", ascending=False), height=600)
 else:
     st.warning("No data available. Please check API or network connection.")
-
