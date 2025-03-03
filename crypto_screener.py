@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import ta  # Alternative to pandas-ta for compatibility
 import time
 from datetime import datetime, timedelta
 
@@ -16,7 +15,7 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 # Sidebar Filters
 st.sidebar.header("🔍 Filters")
 
-# Volume Range Input
+# Volume Range Input (User can type values)
 st.sidebar.subheader("📊 Volume Range (24h)")
 col1, col2 = st.sidebar.columns(2)
 min_volume_input = col1.number_input("Min Volume", min_value=0, max_value=100000000, value=500000, step=50000)
@@ -64,7 +63,7 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Format Volume (in K/M)
+# Format Volume (in K/M) *after* filtering
 def format_volume(volume):
     if volume >= 1_000_000:
         return f"{volume / 1_000_000:.2f}M"
@@ -82,15 +81,15 @@ def update_data():
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
         df = df.drop(columns=["Timestamp"])
 
-        # Apply min & max volume filter
+        # Apply min & max volume filter *before* formatting
         df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
 
-        # Format Volume Column
+        # Convert Volume to readable format (K/M)
         df["Volume"] = df["Volume"].apply(format_volume)
 
         # Display Data
         with placeholder.container():
-            st.dataframe(df.sort_values(by=["Volume"], ascending=False), height=600)
+            st.dataframe(df.sort_values(by="Price", ascending=False), height=600)
 
 while True:
     update_data()
