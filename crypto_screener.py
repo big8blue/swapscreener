@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import pandas_ta as ta  # Technical Indicators
 import time
 from datetime import datetime, timedelta
 
@@ -10,14 +11,13 @@ API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
 # Set Page Configuration
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 
-st.title("🚀 Real-Time Crypto Futures Screener")
+st.title("🚀 Real-Time Crypto Futures Screener with RSI & EMA")
 
 # Sidebar Filters
 st.sidebar.header("🔍 Filters")
 
-# User can either use slider or input box for volume range
+# Volume Range Input
 st.sidebar.subheader("📊 Volume Range (24h)")
-
 col1, col2 = st.sidebar.columns(2)
 min_volume_input = col1.number_input("Min Volume", min_value=0, max_value=100000000, value=500000, step=50000)
 max_volume_input = col2.number_input("Max Volume", min_value=0, max_value=100000000, value=50000000, step=50000)
@@ -31,8 +31,13 @@ min_volume, max_volume = st.sidebar.slider(
     step=50000
 )
 
-# Refresh Rate Control
+# Refresh Rate
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
+
+# RSI & EMA Settings
+st.sidebar.subheader("📈 Indicator Settings")
+rsi_period = st.sidebar.slider("RSI Period", 7, 21, 14)
+ema_period = st.sidebar.slider("EMA Period", 7, 50, 21)
 
 # Caching API Calls (refreshes every X seconds)
 @st.cache_data(ttl=refresh_rate)
@@ -75,6 +80,10 @@ def update_data():
 
         # Apply min & max volume filter
         df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
+
+        # **Add RSI & EMA**
+        df["RSI"] = ta.rsi(df["Price"], length=rsi_period)
+        df["EMA"] = ta.ema(df["Price"], length=ema_period)
 
         # Display Data
         with placeholder.container():
