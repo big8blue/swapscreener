@@ -14,11 +14,24 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 
 # Sidebar Filters
 st.sidebar.header("🔍 Filters")
-min_volume, max_volume = st.sidebar.slider("Volume Range (24h)", 
-                                           min_value=0, 
-                                           max_value=100000000, 
-                                           value=(500000, 50000000), 
-                                           step=50000)
+
+# User can either use slider or input box for volume range
+st.sidebar.subheader("📊 Volume Range (24h)")
+
+col1, col2 = st.sidebar.columns(2)
+min_volume_input = col1.number_input("Min Volume", min_value=0, max_value=100000000, value=500000, step=50000)
+max_volume_input = col2.number_input("Max Volume", min_value=0, max_value=100000000, value=50000000, step=50000)
+
+# Slider for convenience
+min_volume, max_volume = st.sidebar.slider(
+    "Or use the slider below",
+    min_value=0,
+    max_value=100000000,
+    value=(min_volume_input, max_volume_input),
+    step=50000
+)
+
+# Refresh Rate Control
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
 # Caching API Calls (refreshes every X seconds)
