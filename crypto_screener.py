@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
 
 # OKX API Endpoint for Swap Tickers
@@ -12,7 +11,10 @@ st.set_page_config(page_title="USDT Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener (USDT Pairs)")
 
-@st.cache_data(ttl=1)
+# Sidebar refresh control
+refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
+
+@st.cache_data(ttl=refresh_rate)
 def fetch_data():
     """Fetch all USDT swap futures tickers from OKX API."""
     try:
@@ -43,10 +45,10 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Live Updates Without Glitches
+# Live Updates
 placeholder = st.empty()
 
-while True:
+def update_data():
     df = fetch_data()
     if not df.empty:
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
@@ -56,5 +58,6 @@ while True:
         with placeholder.container():
             st.dataframe(df.sort_values(by="Volume", ascending=False), height=600)
 
-    time.sleep(1)  # Refresh every 1 second
-    st.rerun()
+# Auto-refresh every X seconds
+update_data()
+st.experimental_rerun()
