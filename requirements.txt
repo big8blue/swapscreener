@@ -1,3 +1,5 @@
 streamlit
 pandas
 requests
+pandas_ta
+
