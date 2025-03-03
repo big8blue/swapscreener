@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-import pandas_ta as ta  # Technical Indicators
+import ta  # Alternative to pandas-ta for compatibility
 import time
 from datetime import datetime, timedelta
 
@@ -82,8 +82,8 @@ def update_data():
         df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
 
         # **Add RSI & EMA**
-        df["RSI"] = ta.rsi(df["Price"], length=rsi_period)
-        df["EMA"] = ta.ema(df["Price"], length=ema_period)
+        df["RSI"] = ta.momentum.RSIIndicator(df["Price"], window=rsi_period).rsi()
+        df["EMA"] = ta.trend.EMAIndicator(df["Price"], window=ema_period).ema_indicator()
 
         # Display Data
         with placeholder.container():
