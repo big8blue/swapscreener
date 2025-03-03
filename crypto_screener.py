@@ -46,7 +46,7 @@ placeholder = st.empty()
 while True:
     df = fetch_data()
     if not df.empty:
-        update_historical_data(df)
+       
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
         df = df.drop(columns=["Timestamp"])
 
