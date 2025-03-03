@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
 
 # OKX API for all swap tickers
@@ -16,7 +15,11 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 st_autorefresh = st.empty()
 st_autorefresh.text("Updating every second...")
 
-# Caching API Calls
+# Auto-refresh mechanism
+st_autorefresh = st.experimental_data_editor("⏳ Auto-refreshing every second...", key="autorefresh")
+st_autorefresh.write("Updated ✅")
+
+# Caching API Calls (refreshes every 2 seconds)
 @st.cache_data(ttl=2)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
@@ -114,7 +117,6 @@ def update_data():
         # Display Data
         data_container.dataframe(df_filtered.style.apply(highlight_trend, axis=1), height=600)
 
-# Update Data Every Second
+# Auto-refresh every second
+st_autorefresh = st.experimental_data_editor("Updating...", key="autorefresh")
 update_data()
-time.sleep(1)  # Wait 1 second before next refresh
-st.experimental_rerun()
