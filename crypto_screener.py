@@ -3,6 +3,7 @@ import websocket
 import json
 import pandas as pd
 import time
+import threading
 from datetime import datetime
 
 # Global dictionary to store futures data
@@ -42,12 +43,6 @@ def on_open(ws):
     
     ws.send(json.dumps(subscription_payload))
 
-# Streamlit UI
-st.title("📈 CoinDCX Real-Time Futures Screener")
-
-st.sidebar.header("Settings")
-refresh_time = st.sidebar.slider("Refresh Interval (seconds)", 1, 10, 3)
-
 # Start WebSocket
 ws = websocket.WebSocketApp(
     "wss://api.coindcx.com/ws",
@@ -58,17 +53,25 @@ ws = websocket.WebSocketApp(
 
 ws.on_open = on_open
 
-# Start WebSocket in a separate thread
-import threading
+# Run WebSocket in a separate thread
 ws_thread = threading.Thread(target=ws.run_forever)
 ws_thread.daemon = True
 ws_thread.start()
 
-# Streamlit main loop
+# Streamlit UI
+st.title("📈 CoinDCX Real-Time Futures Screener")
+
+st.sidebar.header("Settings")
+refresh_time = st.sidebar.slider("Refresh Interval (seconds)", 1, 10, 3)
+
+# **🔄 Fix: Use `st.empty()` to update UI dynamically**
+placeholder = st.empty()
+
 while True:
     if futures_data:
         df = pd.DataFrame.from_dict(futures_data, orient="index").reset_index()
         df.columns = ["Symbol", "LTP", "Last Updated"]
-        st.dataframe(df)
-
-    time.sleep(refresh_time)  # Fixed line
+        
+        placeholder.dataframe(df)  # ✅ UI updates dynamically
+    
+    time.sleep(refresh_time)  # ✅ UI does not freeze
