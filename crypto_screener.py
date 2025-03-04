@@ -8,44 +8,36 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
 
 st.sidebar.header("🔍 Filters")
-
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
 @st.cache_data(ttl=refresh_rate)
 def fetch_data():
     """Fetch all swap futures tickers from CoinDCX API."""
     try:
-        response = requests.get(API_URL)
-        data = response.json()  # Convert response to JSON
-
-        # Ensure response is a list
-        if isinstance(data, list):
+        st.write("Fetching data...")  # Debugging Log
+        response = requests.get(API_URL, timeout=10)  # Add timeout
+        if response.status_code == 200:
+            data = response.json()
+            st.write("✅ API Response Received")  # Debugging Log
             return data
         else:
-            st.error("Unexpected API response format")
+            st.error(f"API Error: {response.status_code}")
             return None
-
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
+    except requests.exceptions.Timeout:
+        st.error("❌ API Request Timed Out. Try again later.")
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Network Error: {e}")
         return None
 
 data = fetch_data()
 
 if data:
-    # Convert response to DataFrame
     df = pd.DataFrame(data)
-
-    # Display raw data to analyze structure
-    st.write("### Raw API Response in Table")
+    st.write("### Raw API Response")
     st.dataframe(df)
 
-    # Automatically detect available columns
     st.write("### Extracted Columns:")
     st.write(df.columns.tolist())
-
-    # Display structured data (if valid columns exist)
-    if not df.empty and len(df.columns) > 1:
-        st.write("### Processed Data Table")
-        st.dataframe(df)
-    else:
-        st.warning("API response does not contain expected structured data.")
+else:
+    st.warning("⚠️ No data received from API.")
