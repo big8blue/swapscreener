@@ -1,22 +1,44 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
+from datetime import datetime
 
-# API URL
-ACTIVE_FUTURES_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
+# Function to fetch futures data
+def fetch_futures_data():
+    url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        futures_list = []
+        
+        for item in data:
+            futures_list.append({
+                "Pair": item["instrument_name"],
+                "LTP": item["last_price"],
+                "Updated Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+        
+        return pd.DataFrame(futures_list)
+    else:
+        st.error("⚠️ Failed to fetch futures data")
+        return pd.DataFrame()
 
-# Fetch data
-response = requests.get(ACTIVE_FUTURES_URL)
-if response.status_code == 200:
-    futures_data = response.json()
-else:
-    st.error("⚠️ API Fetch Error!")
-    futures_data = []
+# Streamlit UI
+st.set_page_config(page_title="CoinDCX Futures Screener", layout="wide")
 
-# Convert to DataFrame
-if futures_data:
-    df = pd.DataFrame(futures_data)
-    st.title("📊 CoinDCX Futures Screener")
-    st.dataframe(df)
-else:
-    st.write("No data available.")
+# Sidebar Inputs
+st.sidebar.header("⚙️ Settings")
+refresh_seconds = st.sidebar.slider("⏳ Refresh Interval (seconds)", 1, 60, 5)  # User selects refresh rate
+
+st.title("📊 CoinDCX Futures Screener")
+st.write("Live futures data from CoinDCX with real-time updates.")
+
+# Live Updates Loop
+while True:
+    df = fetch_futures_data()
+    st.dataframe(df, height=600, width=800)  # Display table
+    
+    time.sleep(refresh_seconds)  # Refresh every X seconds
+    st.experimental_rerun()  # Rerun script for updates
