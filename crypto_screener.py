@@ -12,7 +12,7 @@ st.sidebar.header("🔍 Filters")
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
 @st.cache_data(ttl=refresh_rate)
-def fetch_data():
+def fetch_active_futures():
     """Fetch all active futures symbols from CoinDCX API."""
     try:
         response = requests.get(API_URL, timeout=10)
@@ -29,7 +29,7 @@ def fetch_data():
 def fetch_ltp(symbols):
     """Fetch Last Traded Price (LTP) for given symbols."""
     try:
-        payload = {"market": symbols}  # CoinDCX API expects a list of markets
+        payload = {"market": symbols}  
         response = requests.post(LTP_API_URL, json=payload, timeout=10)
         if response.status_code == 200:
             return response.json()
@@ -41,43 +41,24 @@ def fetch_ltp(symbols):
         return None
 
 # Fetch Futures Data
-data = fetch_data()
+symbols_list = fetch_active_futures()
 
-if data:
-    # Print API response structure for debugging
-    st.write("### Debug: API Response")
-    st.json(data[:5])  # Show only first 5 items
+if symbols_list and isinstance(symbols_list, list):
+    # Convert list to DataFrame
+    df = pd.DataFrame(symbols_list, columns=['Symbol'])
 
-    # Convert response to DataFrame
-    df = pd.DataFrame(data)
+    # Fetch LTP for each symbol
+    ltp_data = fetch_ltp(df['Symbol'].tolist())
 
-    # Check available columns
-    st.write("### Debug: Available Columns in DataFrame")
-    st.write(df.columns.tolist())
+    if ltp_data:
+        # Convert LTP response to a dictionary for easy lookup
+        ltp_dict = {item['market']: item['price'] for item in ltp_data}
 
-    # Look for the correct column name
-    expected_columns = ['symbol', 'market', 'pair']
-    found_columns = [col for col in expected_columns if col in df.columns]
+        # Add LTP column to DataFrame
+        df['LTP'] = df['Symbol'].map(ltp_dict)
 
-    if found_columns:
-        df = df[[found_columns[0]]]  # Use the first matching column
-        df.rename(columns={found_columns[0]: 'symbol'}, inplace=True)
-
-        # Fetch LTP for each symbol
-        symbols = df['symbol'].tolist()
-        ltp_data = fetch_ltp(symbols)
-
-        if ltp_data:
-            # Convert LTP response to a dictionary for easy lookup
-            ltp_dict = {item['market']: item['price'] for item in ltp_data}
-
-            # Add LTP column to DataFrame
-            df['LTP'] = df['symbol'].map(ltp_dict)
-
-        st.write("### Crypto Futures Data with LTP")
-        st.dataframe(df)
-    else:
-        st.error("❌ No valid symbol column found in API response.")
-
+    # Display DataFrame with two columns: Symbol and LTP
+    st.write("### Active Futures with LTP")
+    st.dataframe(df)
 else:
-    st.warning("⚠️ No data received from API.")
+    st.warning("⚠️ No active futures data received from API.")
