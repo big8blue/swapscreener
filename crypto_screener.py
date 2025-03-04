@@ -1,134 +1,104 @@
 import asyncio
 import json
+import os
 import aiohttp
-import websocket
 import requests
 import numpy as np
-import hmac
-import hashlib
-import time
+import websocket
+from dotenv import load_dotenv
 from collections import deque
-import os
 
-# Load API keys securely
-API_KEY = os.getenv("64fcb132c957dbfc1fd4db8f96d9cf69fb39684333abee29")
-SECRET_KEY = os.getenv("53866511d5f015b28cfaac863065eb75f9f0f9e26d5c905f890095604e7ca37d")
+# Load API Keys securely from .env
+load_dotenv()
+API_KEY = os.getenv("COINDCX_API_KEY")
+SECRET_KEY = os.getenv("COINDCX_SECRET_KEY")
 
 if not API_KEY or not SECRET_KEY:
-    raise ValueError("API keys missing! Set them as environment variables.")
+    raise ValueError("API keys missing! Set them in the .env file.")
 
-# Get user inputs
+# Get user input for trading pair and leverage
 TRADE_SYMBOL = input("Enter the trading pair (e.g., JASMYUSDT): ").strip().upper()
 LEVERAGE = int(input("Enter leverage (e.g., 10 for 10x): "))
 
-# API & WebSocket URLs
-BASE_URL = "https://api.coindcx.com"
-WS_URL = "wss://stream.coindcx.com"
+# Trading Parameters
+MIN_TRADE_SIZE_USD = 6.05  # Min trade size per order
+VOLUME_THRESHOLD = 50000  # Cumulative volume threshold
+momentum_window = deque(maxlen=5)  # Price momentum tracking
+order_book_depth = deque(maxlen=5)  # Bid/ask imbalance tracking
+cumulative_volume = 0  # Initialize cumulative volume
 
-# HFT Strategy Parameters
-MIN_TRADE_SIZE_USD = 6.05  
-VOLUME_THRESHOLD = 50000  
-momentum_window = deque(maxlen=5)
-order_book_depth = deque(maxlen=5)
-cumulative_volume = 0
-
-async def fetch_market_price():
-    """Fetch the latest market price."""
-    url = f"{BASE_URL}/market_data"
+async def fetch_market_data():
+    """Fetch market data for initial reference."""
+    url = "https://api.coindcx.com/market_data"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             data = await response.json()
-            return float(data[TRADE_SYMBOL]['last_price'])
+            return data
 
 def get_trade_quantity(price):
-    """Calculate trade quantity based on min trade size."""
-    return round(MIN_TRADE_SIZE_USD / price, 4)  
+    """Calculate quantity based on $6.05 per trade."""
+    return round(MIN_TRADE_SIZE_USD / price, 4)
 
 def compute_momentum():
-    """Detect market trend direction."""
+    """Check if the last 5 prices indicate an upward or downward trend."""
     if len(momentum_window) < 5:
-        return None
+        return None  # Not enough data
     diff = np.diff(momentum_window)
-    return np.all(diff > 0) or np.all(diff < 0)
+    return np.all(diff > 0) or np.all(diff < 0)  # True if trending up/down
 
 def compute_order_book_imbalance():
-    """Determine bid/ask imbalance."""
+    """Check if bid/ask imbalance favors buyers or sellers."""
     if len(order_book_depth) < 5:
-        return None
+        return None  # Not enough data
     avg_imbalance = np.mean(order_book_depth)
-    return avg_imbalance > 0  
+    return avg_imbalance > 0  # True if buy pressure, False if sell pressure
 
-def create_order_payload(order_type, price):
-    """Create order payload with signature."""
+def place_order(order_type, price):
+    """Place a leveraged trade order."""
     quantity = get_trade_quantity(price) * LEVERAGE
-    timestamp = int(time.time() * 1000)
-    payload = {
+    order_data = {
         "symbol": TRADE_SYMBOL,
         "side": order_type,
         "quantity": quantity,
-        "order_type": "market",
-        "timestamp": timestamp
+        "order_type": "market"
     }
+    headers = {"X-AUTH-APIKEY": API_KEY}
+    response = requests.post("https://api.coindcx.com/trade", json=order_data, headers=headers)
     
-    payload_json = json.dumps(payload, separators=(',', ':'))
-    signature = hmac.new(SECRET_KEY.encode(), payload_json.encode(), hashlib.sha256).hexdigest()
-    
-    return payload, signature
-
-def place_order(order_type, price):
-    """Execute trade on CoinDCX."""
-    payload, signature = create_order_payload(order_type, price)
-    headers = {
-        "X-AUTH-APIKEY": API_KEY,
-        "X-AUTH-SIGNATURE": signature,
-        "Content-Type": "application/json"
-    }
-    
-    response = requests.post(f"{BASE_URL}/trade", json=payload, headers=headers)
     if response.status_code == 200:
-        print(f"✅ {order_type.upper()} order placed: {TRADE_SYMBOL} at {price} with {LEVERAGE}x leverage")
+        print(f"✅ Order placed: {order_type} {quantity} {TRADE_SYMBOL} at {price} with {LEVERAGE}x leverage")
     else:
-        print(f"❌ Order failed! Response: {response.text}")
+        print(f"❌ Order failed: {response.json()}")
 
 def on_message(ws, message):
-    """Handle real-time trade data."""
+    """Process real-time market data."""
     global cumulative_volume
     data = json.loads(message)
+    
+    price = float(data.get('p', 0))
+    volume = float(data.get('v', 0))
+    bid_size = float(data.get('b', 0))
+    ask_size = float(data.get('a', 0))
 
-    for trade in data.get('data', []):
-        if trade['s'] == TRADE_SYMBOL:
-            price = float(trade['p'])
-            volume = float(trade['q'])
-            bid_size = float(trade.get('b', 0))  
-            ask_size = float(trade.get('a', 0))  
+    # Update indicators
+    cumulative_volume += volume
+    momentum_window.append(price)
+    order_book_depth.append(bid_size - ask_size)  # Positive = Buy pressure, Negative = Sell pressure
 
-            # Update indicators
-            cumulative_volume += volume
-            momentum_window.append(price)
-            order_book_depth.append(bid_size - ask_size)
+    # Compute signals
+    is_trending = compute_momentum()
+    is_buy_pressure = compute_order_book_imbalance()
 
-            # Compute signals
-            is_trending = compute_momentum()
-            is_buy_pressure = compute_order_book_imbalance()
-
-            # Execute trade logic
-            if cumulative_volume > VOLUME_THRESHOLD and is_trending and is_buy_pressure:
-                place_order("buy", price)
-                cumulative_volume = 0  
+    # Execute trading logic
+    if cumulative_volume > VOLUME_THRESHOLD and is_trending and is_buy_pressure:
+        place_order("buy", price)
+        cumulative_volume = 0  # Reset after trade
 
 def start_websocket():
-    """Start WebSocket connection for live market data."""
-    ws_payload = {
-        "event": "subscribe",
-        "streams": [f"{TRADE_SYMBOL}@trade"]
-    }
-
-    def on_open(ws):
-        ws.send(json.dumps(ws_payload))
-
-    ws = websocket.WebSocketApp(WS_URL, on_message=on_message, on_open=on_open)
+    """Start real-time market data feed."""
+    ws = websocket.WebSocketApp("wss://public.coindcx.com", on_message=on_message)
     ws.run_forever()
 
 if __name__ == "__main__":
-    asyncio.run(fetch_market_price())
-    start_websocket()
+    asyncio.run(fetch_market_data())  # Fetch initial market data
+    start_websocket()  # Start WebSocket stream
