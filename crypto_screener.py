@@ -7,19 +7,31 @@ import time
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
 
 def fetch_futures_data():
-    """Fetches real-time futures data from CoinDCX API"""
+    """Fetches real-time futures data from CoinDCX API and handles errors."""
     try:
         response = requests.get(API_URL)
+
+        # Check if response is valid JSON
+        if response.status_code != 200:
+            st.error(f"API Error: {response.status_code}")
+            return pd.DataFrame()
+
         data = response.json()
+
+        # Check if API response is a list (expected format)
+        if not isinstance(data, list):
+            st.error("Unexpected API response format!")
+            return pd.DataFrame()
 
         # Extract required fields, handling missing data
         futures_data = []
         for item in data:
-            futures_data.append({
-                "Pair": item.get("symbol", "N/A"),  # Ensure correct key name
-                "LTP": item.get("last_price", "N/A"),
-                "Updated Time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-            })
+            if isinstance(item, dict):  # Ensure item is a dictionary
+                futures_data.append({
+                    "Pair": item.get("symbol", "N/A"),  # Correct key name
+                    "LTP": item.get("last_price", "N/A"),
+                    "Updated Time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                })
 
         return pd.DataFrame(futures_data)
 
@@ -33,9 +45,12 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 # Sidebar input for refresh interval
 refresh_seconds = st.sidebar.slider("Refresh Interval (seconds)", 1, 30, 5)
 
-# Display data
+# Fetch and display data
 df = fetch_futures_data()
-st.dataframe(df)
+if not df.empty:
+    st.dataframe(df)
+else:
+    st.warning("No data available. Check API or try again later.")
 
 # Auto-refresh
 time.sleep(refresh_seconds)
