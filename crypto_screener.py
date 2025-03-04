@@ -10,8 +10,6 @@ st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
 
-Sidebar Filters
-
 st.sidebar.header("🔍 Filters")
 
 Volume Range Input (User can type values)
@@ -30,8 +28,6 @@ max_value=1000.0,
 value=(min_volume_input, max_volume_input),
 step=0.1
 )
-
-Refresh Rate
 
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
@@ -61,7 +57,6 @@ except Exception as e:
     st.error(f"Error fetching data: {e}")  
     return pd.DataFrame()
 
-Convert UTC to IST
 
 def convert_to_ist(utc_time):
 ist_time = utc_time + timedelta(hours=5, minutes=30)
