@@ -2,7 +2,6 @@ import streamlit as st
 import websocket
 import json
 import pandas as pd
-import time
 import requests
 from datetime import datetime
 import threading
@@ -19,7 +18,7 @@ refresh_time = st.sidebar.number_input("Set refresh time (seconds)", min_value=1
 # WebSocket URL
 WS_URL = "wss://stream.coindcx.com/socket.io/?EIO=3&transport=websocket"
 
-# Initialize session state for DataFrame
+# Initialize session state
 if "df" not in st.session_state:
     st.session_state.df = pd.DataFrame(columns=["Futures Name", "Last Traded Price", "24h High", "24h Low", "24h Volume", "Change (%)", "Last Updated Time"])
 
@@ -40,6 +39,7 @@ def on_message(ws, message):
         market_data = fetch_24h_data()
 
         if isinstance(data, list):
+            new_data = []
             for item in data:
                 if "m" in item and "b" in item and "s" in item:
                     futures_name = item["s"]
@@ -53,7 +53,7 @@ def on_message(ws, message):
                     volume_24h = float(market_info.get("volume", 0))
                     change_24h = float(market_info.get("change_24_hour", 0))
 
-                    new_row = {
+                    new_data.append({
                         "Futures Name": futures_name,
                         "Last Traded Price": last_price,
                         "24h High": high_24h,
@@ -61,10 +61,11 @@ def on_message(ws, message):
                         "24h Volume": volume_24h,
                         "Change (%)": change_24h,
                         "Last Updated Time": timestamp
-                    }
+                    })
 
-                    # Update session state
-                    st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True).drop_duplicates(subset=["Futures Name"], keep="last")
+            # Update session state
+            if new_data:
+                st.session_state.df = pd.DataFrame(new_data)
 
     except json.JSONDecodeError:
         pass
@@ -74,13 +75,12 @@ def connect_websocket():
     ws = websocket.WebSocketApp(WS_URL, on_message=on_message)
     ws.run_forever()
 
-# Run WebSocket in the background
-ws_thread = threading.Thread(target=connect_websocket, daemon=True)
-ws_thread.start()
+# Start WebSocket in a background thread
+if "websocket_thread" not in st.session_state:
+    ws_thread = threading.Thread(target=connect_websocket, daemon=True)
+    ws_thread.start()
+    st.session_state.websocket_thread = ws_thread
 
-# Streamlit UI update loop
-table_placeholder = st.empty()
-
-while True:
-    table_placeholder.dataframe(st.session_state.df, use_container_width=True)
-    time.sleep(refresh_time)
+# Display DataFrame with automatic refresh
+st.dataframe(st.session_state.df, use_container_width=True)
+st.experimental_rerun()
