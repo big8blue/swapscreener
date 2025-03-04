@@ -17,7 +17,7 @@ st.sidebar.header("Settings")
 refresh_time = st.sidebar.number_input("Set refresh time (seconds)", min_value=1, max_value=60, value=5, step=1)
 
 # WebSocket URL
-WS_URL = "wss://stream.coindcx.com/socket.io/?EIO=3&transport=websocket"
+WS_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
 
 # Initialize DataFrame
 columns = ["Futures Name", "Last Traded Price", "24h High", "24h Low", "24h Volume", "Change (%)", "Last Updated Time"]
