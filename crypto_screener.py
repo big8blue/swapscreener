@@ -4,8 +4,6 @@ import pandas as pd
 import time
 from datetime import datetime, timedelta
 
-OKX API for Swap Futures
-
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?="
 
 Set Page Configuration
