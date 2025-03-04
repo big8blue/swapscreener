@@ -1,35 +1,38 @@
 import json
 import websocket
-
-# User input for futures trading pair (e.g., JASMYUSDT)
-TRADE_SYMBOL = input("Enter the futures trading pair (e.g., JASMYUSDT): ").strip().upper()
+import threading
 
 # CoinDCX WebSocket URL
 WS_URL = "wss://stream.coindcx.com/ws/v1"
 
-# Subscription message for futures data
+# User input for futures trading pair (e.g., JASMYUSDT)
+TRADE_SYMBOL = input("Enter the futures trading pair (e.g., JASMYUSDT): ").strip().upper()
+
+# Subscription message for futures ticker data
 subscribe_message = {
     "channel": "ticker",
     "payload": {
-        "symbol": TRADE_SYMBOL
+        "symbols": [TRADE_SYMBOL]
     }
 }
 
 def on_message(ws, message):
-    """Handle incoming WebSocket messages and display live market data."""
+    """Process and display live market data."""
     data = json.loads(message)
     
     if 'ticker' in data:
         ticker = data['ticker']
-        price = float(ticker.get('last_price', 0))
-        bid_price = float(ticker.get('best_bid', 0))
-        ask_price = float(ticker.get('best_ask', 0))
-        volume = float(ticker.get('volume', 0))
+        symbol = ticker.get('symbol', TRADE_SYMBOL)
+        last_price = ticker.get('last_price', "N/A")
+        best_bid = ticker.get('best_bid', "N/A")
+        best_ask = ticker.get('best_ask', "N/A")
+        volume = ticker.get('volume', "N/A")
 
         # Display real-time futures data
-        print(f"\n🔹 **{TRADE_SYMBOL} Futures Data** 🔹")
-        print(f"📌 Current Price: ${price}")
-        print(f"📈 Best Bid: ${bid_price}  |  📉 Best Ask: ${ask_price}")
+        print("\n🔹 **Real-Time Futures Data** 🔹")
+        print(f"📌 Symbol: {symbol}")
+        print(f"📈 Last Price: ${last_price}")
+        print(f"📊 Best Bid: ${best_bid} | Best Ask: ${best_ask}")
         print(f"💰 24h Volume: {volume}")
         print("-" * 40)
 
@@ -47,7 +50,7 @@ def on_close(ws, close_status, close_message):
     print("🔴 WebSocket Disconnected.")
 
 def start_websocket():
-    """Start real-time market data feed."""
+    """Start real-time market data stream."""
     ws = websocket.WebSocketApp(
         WS_URL,
         on_open=on_open,
@@ -57,6 +60,8 @@ def start_websocket():
     )
     ws.run_forever()
 
+# Run WebSocket in a separate thread to prevent blocking
 if __name__ == "__main__":
     print(f"📡 Connecting to CoinDCX WebSocket for {TRADE_SYMBOL} futures...")
-    start_websocket()
+    thread = threading.Thread(target=start_websocket)
+    thread.start()
