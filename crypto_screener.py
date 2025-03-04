@@ -4,7 +4,7 @@ import pandas as pd
 
 # API Endpoints
 MARKETS_DETAILS_URL = "https://api.coindcx.com/exchange/v1/markets_details"
-TICKER_URL = "https://api.coindcx.com/market_data/ticker"
+LTP_URL = "https://api.coindcx.com/market_data/current_prices"
 
 st.set_page_config(page_title="Crypto Futures LTP", layout="wide")
 st.title("🚀 Active Crypto Futures and Their Last Traded Prices")
@@ -20,25 +20,25 @@ def fetch_markets_details():
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        st.error(f"Error fetching markets details: {e}")
+        st.error(f"Error fetching market details: {e}")
         return None
 
 @st.cache_data(ttl=refresh_rate)
-def fetch_ticker_data():
-    """Fetch ticker data for all markets from CoinDCX API."""
+def fetch_ltp_data():
+    """Fetch real-time LTP data for all markets from CoinDCX API."""
     try:
-        response = requests.get(TICKER_URL, timeout=10)
+        response = requests.get(LTP_URL, timeout=10)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        st.error(f"Error fetching ticker data: {e}")
+        st.error(f"Error fetching LTP data: {e}")
         return None
 
 # Fetch data
 markets_details = fetch_markets_details()
-ticker_data = fetch_ticker_data()
+ltp_data = fetch_ltp_data()
 
-if markets_details and ticker_data:
+if markets_details and ltp_data:
     # Filter for active futures markets
     futures_markets = [
         market for market in markets_details.values()
@@ -56,7 +56,7 @@ if markets_details and ticker_data:
         }, inplace=True)
 
         # Create a dictionary for quick lookup of LTP
-        ltp_dict = {item['market']: item['last_price'] for item in ticker_data}
+        ltp_dict = {item['market']: item['last_price'] for item in ltp_data}
 
         # Map LTP to each futures symbol
         futures_df['LTP'] = futures_df['Symbol'].map(ltp_dict)
