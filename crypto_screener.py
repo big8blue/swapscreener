@@ -2,63 +2,69 @@ import streamlit as st
 import requests
 import pandas as pd
 
-API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
-LTP_API_URL = "https://api.coindcx.com/market_data/current_prices"
+# API Endpoints
+MARKETS_DETAILS_URL = "https://api.coindcx.com/exchange/v1/markets_details"
+TICKER_URL = "https://api.coindcx.com/market_data/ticker"
 
-st.set_page_config(page_title="Crypto Screener", layout="wide")
-st.title("🚀 Real-Time Crypto Futures Screener")
+st.set_page_config(page_title="Crypto Futures LTP", layout="wide")
+st.title("🚀 Active Crypto Futures and Their Last Traded Prices")
 
-st.sidebar.header("🔍 Filters")
-refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
+# Sidebar for refresh rate
+refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 10, 300, 60)
 
 @st.cache_data(ttl=refresh_rate)
-def fetch_active_futures():
-    """Fetch all active futures symbols from CoinDCX API."""
+def fetch_markets_details():
+    """Fetch details of all markets from CoinDCX API."""
     try:
-        response = requests.get(API_URL, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            st.error(f"API Error: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Network Error: {e}")
+        response = requests.get(MARKETS_DETAILS_URL, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        st.error(f"Error fetching markets details: {e}")
         return None
 
 @st.cache_data(ttl=refresh_rate)
-def fetch_ltp(symbols):
-    """Fetch Last Traded Price (LTP) for given symbols."""
+def fetch_ticker_data():
+    """Fetch ticker data for all markets from CoinDCX API."""
     try:
-        payload = {"market": symbols}  
-        response = requests.post(LTP_API_URL, json=payload, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            st.error(f"LTP API Error: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Network Error: {e}")
+        response = requests.get(TICKER_URL, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        st.error(f"Error fetching ticker data: {e}")
         return None
 
-# Fetch Futures Data
-symbols_list = fetch_active_futures()
+# Fetch data
+markets_details = fetch_markets_details()
+ticker_data = fetch_ticker_data()
 
-if symbols_list and isinstance(symbols_list, list):
-    # Convert list to DataFrame
-    df = pd.DataFrame(symbols_list, columns=['Symbol'])
+if markets_details and ticker_data:
+    # Filter for active futures markets
+    futures_markets = [
+        market for market in markets_details.values()
+        if market.get('contract_type') == 'futures' and market.get('status') == 'active'
+    ]
 
-    # Fetch LTP for each symbol
-    ltp_data = fetch_ltp(df['Symbol'].tolist())
+    if futures_markets:
+        # Create DataFrame for futures markets
+        futures_df = pd.DataFrame(futures_markets)
+        futures_df = futures_df[['symbol', 'base_currency_short_name', 'target_currency_short_name']]
+        futures_df.rename(columns={
+            'symbol': 'Symbol',
+            'base_currency_short_name': 'Base Currency',
+            'target_currency_short_name': 'Quote Currency'
+        }, inplace=True)
 
-    if ltp_data:
-        # Convert LTP response to a dictionary for easy lookup
-        ltp_dict = {item['market']: item['price'] for item in ltp_data}
+        # Create a dictionary for quick lookup of LTP
+        ltp_dict = {item['market']: item['last_price'] for item in ticker_data}
 
-        # Add LTP column to DataFrame
-        df['LTP'] = df['Symbol'].map(ltp_dict)
+        # Map LTP to each futures symbol
+        futures_df['LTP'] = futures_df['Symbol'].map(ltp_dict)
 
-    # Display DataFrame with two columns: Symbol and LTP
-    st.write("### Active Futures with LTP")
-    st.dataframe(df)
+        # Display the DataFrame
+        st.write("### Active Futures and Their Last Traded Prices")
+        st.dataframe(futures_df)
+    else:
+        st.warning("No active futures markets found.")
 else:
-    st.warning("⚠️ No active futures data received from API.")
+    st.error("Failed to retrieve data from CoinDCX API.")
