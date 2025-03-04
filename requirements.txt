@@ -5,7 +5,6 @@ pandas_ta
 setuptools
 ta
 aiohttp
-websocket-client 
-requests 
-aiohttp 
+websocket-client   
 numpy
+python-dotenv
