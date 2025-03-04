@@ -15,7 +15,7 @@ def fetch_futures_data():
         response = requests.get(API_URL)
         data = response.json()
 
-        if isinstance(data, list):  # Ensure response is a list
+        if isinstance(data, list) and len(data) > 0:
             df = pd.DataFrame([
                 {
                     "Pair": item.get("symbol", "N/A"),
@@ -26,11 +26,11 @@ def fetch_futures_data():
             ])
             return df
         else:
-            st.error("Unexpected API response format!")
+            st.error("❌ API response is empty or incorrect format!")
             return pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Exception: {e}")
+        st.error(f"❌ Exception: {e}")
         return pd.DataFrame()
 
 # Streamlit UI
@@ -41,13 +41,9 @@ while True:
     df = fetch_futures_data()
     
     if not df.empty:
-        # Display Data in Columns
-        num_cols = 3  # Number of columns
-        cols = st.columns(num_cols)
-
-        for i, row in df.iterrows():
-            with cols[i % num_cols]:  # Distribute across columns
-                st.metric(label=row["Pair"], value=row["LTP"], delta=row["Updated Time"])
+        with st.container():  # Use container to ensure display
+            for index, row in df.iterrows():
+                st.write(f"**{row['Pair']}** - LTP: {row['LTP']} (Updated: {row['Updated Time']})")
     
-    time.sleep(refresh_rate)  # Refresh based on user input
-    st.rerun()  # Rerun script to update data
+    time.sleep(refresh_rate)  # Wait before refreshing
+    st.experimental_rerun()  # Refresh app to update data
