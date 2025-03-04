@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
+import time
 
 # OKX API for Swap Futures
 API_URL = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
@@ -33,8 +33,12 @@ min_volume, max_volume = st.sidebar.slider(
 # Refresh Rate
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
-# Caching API Calls (refreshes every X seconds)
-@st.cache_data(ttl=refresh_rate)
+# Convert UTC to IST
+def convert_to_ist(utc_time):
+    ist_time = utc_time + timedelta(hours=5, minutes=30)
+    return ist_time.strftime("%I:%M:%S %p")
+
+# Fetch Data Function (No Caching)
 def fetch_data():
     """Fetch all swap futures tickers from OKX API."""
     try:
@@ -58,16 +62,12 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-# Convert UTC to IST
-def convert_to_ist(utc_time):
-    ist_time = utc_time + timedelta(hours=5, minutes=30)
-    return ist_time.strftime("%I:%M:%S %p")
-
 # Live Updates with Auto Refresh
 placeholder = st.empty()
 
-def update_data():
+while True:
     df = fetch_data()
+    
     if not df.empty:
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
         df = df.drop(columns=["Timestamp"])
@@ -79,12 +79,7 @@ def update_data():
         df["Volume"] = df["Volume"].apply(lambda x: f"{x:.2f}M")
 
         # Display Data
-        with placeholder.container():
-            st.dataframe(df.sort_values(by="Price", ascending=False), height=600)
+        placeholder.dataframe(df.sort_values(by="Price", ascending=False), height=600)
 
-while True:
-    update_data()
-    time.sleep(refresh_rate)  # Refresh based on user input
-
-
-
+    time.sleep(refresh_rate)
+    st.experimental_rerun()  # **Refresh Streamlit UI Properly**
