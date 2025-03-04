@@ -1,70 +1,73 @@
 import streamlit as st
-import requests
+import websocket
+import json
 import pandas as pd
+from datetime import datetime
 
-# API Endpoints
-MARKETS_DETAILS_URL = "https://api.coindcx.com/exchange/v1/markets_details"
-LTP_URL = "https://api.coindcx.com/market_data/current_prices"
+# Global variables
+futures_data = {}
 
-st.set_page_config(page_title="Crypto Futures LTP", layout="wide")
-st.title("🚀 Active Crypto Futures and Their Last Traded Prices")
+# Function to process WebSocket messages
+def on_message(ws, message):
+    global futures_data
+    data = json.loads(message)
+    
+    for item in data:
+        market = item.get("s", "Unknown")
+        price = item.get("bp", None)  # Best price (Last Traded Price)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Sidebar for refresh rate
-refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 10, 300, 60)
+        if price:
+            futures_data[market] = {"LTP": price, "Last Updated": timestamp}
 
-@st.cache_data(ttl=refresh_rate)
-def fetch_markets_details():
-    """Fetch details of all markets from CoinDCX API."""
-    try:
-        response = requests.get(MARKETS_DETAILS_URL, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        st.error(f"Error fetching market details: {e}")
-        return None
+# Function to handle errors
+def on_error(ws, error):
+    st.error(f"WebSocket Error: {error}")
 
-@st.cache_data(ttl=refresh_rate)
-def fetch_ltp_data():
-    """Fetch real-time LTP data for all markets from CoinDCX API."""
-    try:
-        response = requests.get(LTP_URL, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        st.error(f"Error fetching LTP data: {e}")
-        return None
+# Function to handle WebSocket close
+def on_close(ws, close_status_code, close_msg):
+    st.warning("WebSocket Disconnected")
 
-# Fetch data
-markets_details = fetch_markets_details()
-ltp_data = fetch_ltp_data()
+# Function to initiate WebSocket connection
+def on_open(ws):
+    st.success("Connected to CoinDCX WebSocket")
+    
+    # Subscribe to futures tickers
+    subscription_payload = {
+        "action": "subscribe",
+        "channel": "market_data",
+        "symbols": ["B-PONKE_USDT", "B-COW_USDT", "B-CETUS_USDT"]  # Modify based on available tickers
+    }
+    
+    ws.send(json.dumps(subscription_payload))
 
-if markets_details and ltp_data:
-    # Filter for active futures markets
-    futures_markets = [
-        market for market in markets_details.values()
-        if market.get('contract_type') == 'futures' and market.get('status') == 'active'
-    ]
+# Streamlit UI
+st.title("📈 Real-Time CoinDCX Futures Screener")
 
-    if futures_markets:
-        # Create DataFrame for futures markets
-        futures_df = pd.DataFrame(futures_markets)
-        futures_df = futures_df[['symbol', 'base_currency_short_name', 'target_currency_short_name']]
-        futures_df.rename(columns={
-            'symbol': 'Symbol',
-            'base_currency_short_name': 'Base Currency',
-            'target_currency_short_name': 'Quote Currency'
-        }, inplace=True)
+st.sidebar.header("Settings")
+refresh_time = st.sidebar.slider("Refresh Interval (seconds)", 1, 10, 3)
 
-        # Create a dictionary for quick lookup of LTP
-        ltp_dict = {item['market']: item['last_price'] for item in ltp_data}
+# Start WebSocket
+ws = websocket.WebSocketApp(
+    "wss://api.coindcx.com/ws",
+    on_message=on_message,
+    on_error=on_error,
+    on_close=on_close
+)
 
-        # Map LTP to each futures symbol
-        futures_df['LTP'] = futures_df['Symbol'].map(ltp_dict)
+ws.on_open = on_open
 
-        # Display the DataFrame
-        st.write("### Active Futures and Their Last Traded Prices")
-        st.dataframe(futures_df)
-    else:
-        st.warning("No active futures markets found.")
-else:
-    st.error("Failed to retrieve data from CoinDCX API.")
+# Start WebSocket in the background
+import threading
+ws_thread = threading.Thread(target=ws.run_forever)
+ws_thread.daemon = True
+ws_thread.start()
+
+# Main display loop
+while True:
+    if futures_data:
+        df = pd.DataFrame.from_dict(futures_data, orient="index").reset_index()
+        df.columns = ["Symbol", "LTP", "Last Updated"]
+        st.dataframe(df)
+
+    st.sleep(refresh_time)
