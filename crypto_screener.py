@@ -18,29 +18,19 @@ st.sidebar.header("🔍 Filters")
 # Volume Range Input (User can type values)
 st.sidebar.subheader("📊 Volume Range (in Millions)")
 col1, col2 = st.sidebar.columns(2)
-min_volume_input = col1.number_input("Min Volume (M)", min_value=0.0, max_value=1000.0, value=0.5, step=0.1)
-max_volume_input = col2.number_input("Max Volume (M)", min_value=0.0, max_value=1000.0, value=50.0, step=0.1)
+min_volume = col1.number_input("Min Volume (M)", min_value=0.0, max_value=1000.0, value=0.5, step=0.1)
+max_volume = col2.number_input("Max Volume (M)", min_value=0.0, max_value=1000.0, value=50.0, step=0.1)
 
-# Slider for convenience
-min_volume, max_volume = st.sidebar.slider(
-    "Or use the slider below",
-    min_value=0.0,
-    max_value=1000.0,
-    value=(min_volume_input, max_volume_input),
-    step=0.1
-)
-
-# Refresh Rate
+# Refresh Rate Selection
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
-# Convert UTC to IST
+# Function to Convert UTC to IST
 def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# Fetch Data Function (No Caching)
+# Function to Fetch Data
 def fetch_data():
-    """Fetch all swap futures tickers from OKX API."""
     try:
         response = requests.get(API_URL)
         data = response.json().get("data", [])
@@ -62,24 +52,30 @@ def fetch_data():
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
-# Live Updates with Auto Refresh
+# **Main App Loop**
 placeholder = st.empty()
 
+# **Auto Refreshing Using Streamlit's rerun Mechanism**
+last_update = time.time()
 while True:
-    df = fetch_data()
-    
-    if not df.empty:
-        df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
-        df = df.drop(columns=["Timestamp"])
+    # Refresh data only when the refresh rate time has passed
+    if time.time() - last_update >= refresh_rate:
+        last_update = time.time()
 
-        # Apply min & max volume filter
-        df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
+        df = fetch_data()
 
-        # Convert Volume to readable format (M)
-        df["Volume"] = df["Volume"].apply(lambda x: f"{x:.2f}M")
+        if not df.empty:
+            df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
+            df = df.drop(columns=["Timestamp"])
 
-        # Display Data
-        placeholder.dataframe(df.sort_values(by="Price", ascending=False), height=600)
+            # Apply min & max volume filter
+            df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
 
-    time.sleep(refresh_rate)
-    st.experimental_rerun()  # **Refresh Streamlit UI Properly**
+            # Convert Volume to readable format (M)
+            df["Volume"] = df["Volume"].apply(lambda x: f"{x:.2f}M")
+
+            # Display Data
+            with placeholder.container():
+                st.dataframe(df.sort_values(by="Price", ascending=False), height=600)
+
+        st.experimental_rerun()  # Refresh UI for latest input values
