@@ -45,13 +45,20 @@ st.title("🚀 Real-Time Crypto Futures Screener")
 # Sidebar input for refresh interval
 refresh_seconds = st.sidebar.slider("Refresh Interval (seconds)", 1, 30, 5)
 
-# Fetch and display data
-df = fetch_futures_data()
-if not df.empty:
-    st.dataframe(df)
-else:
-    st.warning("No data available. Check API or try again later.")
+# Placeholder for updating data
+data_placeholder = st.empty()
 
-# Auto-refresh
-time.sleep(refresh_seconds)
-st.experimental_rerun()
+while True:
+    df = fetch_futures_data()
+    
+    # Display DataFrame
+    if not df.empty:
+        data_placeholder.dataframe(df)
+    else:
+        st.warning("No data available. Check API or try again later.")
+
+    # Wait for the refresh interval
+    time.sleep(refresh_seconds)
+
+    # Clear cache for new API request
+    st.cache_data.clear()
