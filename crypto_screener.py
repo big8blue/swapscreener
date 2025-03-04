@@ -5,7 +5,19 @@ import pandas as pd
 import threading
 import requests
 from datetime import datetime
+import json
 
+import requests  # Install requests module first.
+
+# Use this url to get the USDT active instruments
+url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
+
+# Use this url to get the INR active instruments
+#url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=INR"
+
+response = requests.get(url)
+data = response.json()
+print(json.dumps(data, indent=2))
 # Streamlit UI setup
 st.set_page_config(page_title="JASMY Futures Screener", layout="wide")
 st.title("📈 JASMY Futures Screener (Real-Time)")
