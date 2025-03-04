@@ -32,38 +32,38 @@ min_volume, max_volume = st.sidebar.slider(
 # ✅ Refresh Rate Selection
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
-# ✅ Function to Fetch Data
+# ✅ Function to Fetch Data (Auto Refresh)
+@st.cache_data(ttl=refresh_rate)
 def fetch_data():
     """Fetch active futures data from CoinDCX API and handle API structure."""
     try:
         response = requests.get(API_URL)
         data = response.json()
 
-        # 🔍 Debug API response (Print JSON structure to see actual keys)
-        if isinstance(data, list):
-            st.write("API Response Sample:", data[:2])  # Print first 2 items
-
-        if not data or not isinstance(data, list):  # Ensure response is a list
+        if not isinstance(data, list):  # Ensure response is a list
+            st.error("Invalid API response format")
             return pd.DataFrame()
 
-        # ✅ Convert JSON response into DataFrame
         df = pd.DataFrame(data)
 
-        # 🔍 Display actual column names for debugging
+        # ✅ Print available columns for debugging
         st.write("Available Columns:", df.columns.tolist())
 
-        # ✅ Dynamically filter relevant columns
-        required_columns = ["symbol", "mark_price", "volume", "timestamp"]
-        df = df[[col for col in required_columns if col in df.columns]]
+        # ✅ Check if required columns exist
+        if not {"symbol", "mark_price", "volume", "timestamp"}.issubset(df.columns):
+            st.error("Missing expected columns in API response")
+            return pd.DataFrame()
 
-        if set(required_columns).issubset(df.columns):
-            df.columns = ["Symbol", "Price", "Volume", "Timestamp"]
-            df["Price"] = df["Price"].astype(float)
-            df["Volume"] = df["Volume"].astype(float) / 1_000_000  # Convert volume to Millions (M)
-            df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
+        # ✅ Select relevant columns
+        df = df[["symbol", "mark_price", "volume", "timestamp"]]
+        df.columns = ["Symbol", "Price", "Volume", "Timestamp"]
+        
+        df["Price"] = df["Price"].astype(float)
+        df["Volume"] = df["Volume"].astype(float) / 1_000_000  # Convert to Millions (M)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
 
-            # ✅ Filter for USDT futures
-            df = df[df["Symbol"].str.endswith("_USDT")]
+        # ✅ Filter for USDT futures
+        df = df[df["Symbol"].str.endswith("_USDT")]
 
         return df
 
@@ -76,13 +76,12 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# ✅ Live Updates (No Infinite Loop)
+# ✅ Display Table
 placeholder = st.empty()
 
-# ✅ Main Data Refreshing Loop (Streamlit handles reruns)
 def update_data():
     df = fetch_data()
-
+    
     if not df.empty:
         df["Updated Time (IST)"] = df["Timestamp"].apply(convert_to_ist)
         df = df.drop(columns=["Timestamp"])
@@ -97,6 +96,5 @@ def update_data():
         with placeholder.container():
             st.dataframe(df.sort_values(by="Price", ascending=False), height=600)
 
-# ✅ Auto-refresh using Streamlit rerun (no need for while True)
-st.experimental_rerun()
-st.stop()
+# ✅ Run update_data() once on launch
+update_data()
