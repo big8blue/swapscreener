@@ -6,8 +6,6 @@ from datetime import datetime, timedelta
 
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?="
 
-Set Page Configuration
-
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
