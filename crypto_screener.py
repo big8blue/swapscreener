@@ -13,20 +13,25 @@ def fetch_futures_data():
     """Fetches real-time futures data from CoinDCX."""
     try:
         response = requests.get(API_URL)
-        if response.status_code == 200:
-            data = response.json()
+        data = response.json()
+
+        # Print API response to inspect structure
+        st.write("API Response:", data)
+
+        if isinstance(data, list):  # Ensure response is a list of dictionaries
             df = pd.DataFrame([
                 {
-                    "Pair": item.get("contract_name", "N/A"),
+                    "Pair": item.get("symbol", "N/A"),  # Adjust based on actual key names
                     "LTP": item.get("last_price", "N/A"),
                     "Updated Time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
                 }
-                for item in data
+                for item in data if isinstance(item, dict)  # Ensure item is a dictionary
             ])
             return df
         else:
-            st.error("Error fetching data from CoinDCX API!")
+            st.error("Unexpected API response format!")
             return pd.DataFrame()
+
     except Exception as e:
         st.error(f"Exception: {e}")
         return pd.DataFrame()
@@ -34,9 +39,6 @@ def fetch_futures_data():
 st.title("CoinDCX Crypto Futures Screener")
 st.write("Displaying real-time futures data from CoinDCX.")
 
-while True:
-    df = fetch_futures_data()
-    if not df.empty:
-        st.dataframe(df)
-    time.sleep(refresh_rate)
-    st.experimental_rerun()
+df = fetch_futures_data()
+if not df.empty:
+    st.dataframe(df)
