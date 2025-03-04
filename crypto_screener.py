@@ -1,96 +1,101 @@
-import streamlit as st
+import asyncio
+import json
+import aiohttp
+import websocket
 import requests
-import pandas as pd
-import time
-from datetime import datetime, timedelta
+import numpy as np
+from collections import deque
 
-# CoinDCX API Endpoints
-MARKETS_URL = "https://api.coindcx.com/exchange/v1/markets"
-CANDLES_URL = "https://public.coindcx.com/market_data/candles"
+# CoinDCX API Keys
 API_KEY = "64fcb132c957dbfc1fd4db8f96d9cf69fb39684333abee29"
-HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+SECRET_KEY = "53866511d5f015b28cfaac863065eb75f9f0f9e26d5c905f890095604e7ca37d"
 
-# Streamlit Page Configuration
-st.set_page_config(page_title="🚀 Crypto Futures Screener", layout="wide")
-st.title("📊 CoinDCX Real-Time Futures Screener")
+# WebSocket & API URLs
+WS_URL = "wss://public.coindcx.com"
 
-# Sidebar Filters
-st.sidebar.header("🔍 Filters")
+# Get user inputs
+TRADE_SYMBOL = input("Enter the trading pair (e.g., JASMYUSDT): ").strip().upper()
+LEVERAGE = int(input("Enter leverage (e.g., 10 for 10x): "))
 
-# Volume Range Filter
-st.sidebar.subheader("📊 Volume Range (Millions)")
-col1, col2 = st.sidebar.columns(2)
-min_volume = col1.number_input("Min Volume (M)", min_value=0.0, max_value=1000.0, value=0.5, step=0.1)
-max_volume = col2.number_input("Max Volume (M)", min_value=0.0, max_value=1000.0, value=50.0, step=0.1)
+# Minimum trade size ($6.05 per trade)
+MIN_TRADE_SIZE_USD = 6.05  
 
-# Refresh Rate
-refresh_rate = st.sidebar.slider("⏳ Refresh Rate (Seconds)", 1, 10, 1)
+# Trading Parameters
+cumulative_volume = 0
+volume_threshold = 50000  # Adjust based on market conditions
+momentum_window = deque(maxlen=5)  # Tracks price momentum
+order_book_depth = deque(maxlen=5)  # Tracks bid/ask imbalance
 
-# Function to Fetch Futures Markets
-def get_futures_markets():
-    """Fetch all available futures markets from CoinDCX."""
-    try:
-        response = requests.get(MARKETS_URL, headers=HEADERS)
-        if response.status_code != 200:
-            st.error(f"API Error: {response.status_code} - {response.text}")
-            return []
+async def fetch_market_data():
+    """Fetch market data for initial reference."""
+    url = f"https://api.coindcx.com/market_data"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            data = await response.json()
+            return data
 
-        data = response.json()
-        
-        # Ensure correct format
-        if isinstance(data, dict) and "markets" in data:
-            data = data["markets"]
+def get_trade_quantity(price):
+    """Calculate quantity based on the minimum trade size of $6.05 per trade."""
+    return round(MIN_TRADE_SIZE_USD / price, 4)  
 
-        if not isinstance(data, list):
-            st.error("Unexpected API response format.")
-            return []
+def compute_momentum():
+    """Check if the last 5 prices indicate an upward or downward trend."""
+    if len(momentum_window) < 5:
+        return None  # Not enough data
+    diff = np.diff(momentum_window)
+    return np.all(diff > 0) or np.all(diff < 0)  # True if trending up/down
 
-        # Filter only futures markets
-        futures_markets = [m["market"] for m in data if isinstance(m, dict) and 'FUTURES' in m.get('market', '')]
-        return futures_markets
-    except Exception as e:
-        st.error(f"Error fetching futures markets: {e}")
-        return []
+def compute_order_book_imbalance():
+    """Check if bid/ask imbalance favors buyers or sellers."""
+    if len(order_book_depth) < 5:
+        return None  # Not enough data
+    avg_imbalance = np.mean(order_book_depth)
+    return avg_imbalance > 0  # True if buy pressure, False if sell pressure
 
-# Function to Fetch Futures Data
-def fetch_futures_data():
-    """Fetch futures volume data for each symbol."""
-    futures_symbols = get_futures_markets()
-    if not futures_symbols:
-        return pd.DataFrame()
-
-    results = []
-    for symbol in futures_symbols:
-        try:
-            response = requests.get(CANDLES_URL, params={"symbol": symbol, "interval": "1m", "limit": 1}, headers=HEADERS)
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and data:
-                    results.append({"Symbol": symbol, "Volume": float(data[0]["volume"])})
-        except Exception as e:
-            st.warning(f"Error fetching {symbol}: {e}")
-
-    df = pd.DataFrame(results)
-
-    # Convert Volume to Millions (M)
-    df["Volume"] = df["Volume"] / 1_000_000
-    df = df[(df["Volume"] >= min_volume) & (df["Volume"] <= max_volume)]
-    
-    return df.sort_values(by="Volume", ascending=False)
-
-# UI Placeholder for Live Updates
-placeholder = st.empty()
-
-# Live Update Function
-def update_data():
-    df = fetch_futures_data()
-    if not df.empty:
-        with placeholder.container():
-            st.dataframe(df, use_container_width=True)
+def place_order(order_type, price):
+    """Place a trade with leverage."""
+    quantity = get_trade_quantity(price) * LEVERAGE
+    order_data = {
+        "symbol": TRADE_SYMBOL,
+        "side": order_type,
+        "quantity": quantity,
+        "order_type": "market"
+    }
+    response = requests.post("https://api.coindcx.com/trade", json=order_data, headers={"X-AUTH-APIKEY": API_KEY})
+    if response.status_code == 200:
+        print(f"✅ Order placed: {order_type} {quantity} {TRADE_SYMBOL} at {price} with {LEVERAGE}x leverage")
     else:
-        st.warning("No data available. Check API status.")
+        print("❌ Order failed!")
 
-# Auto-refresh Loop
-while True:
-    update_data()
-    time.sleep(refresh_rate)
+def on_message(ws, message):
+    """Process live market data."""
+    global cumulative_volume
+    data = json.loads(message)
+
+    price = float(data['p'])
+    volume = float(data['v'])
+    bid_size = float(data.get('b', 0))  # Bid size from order book
+    ask_size = float(data.get('a', 0))  # Ask size from order book
+
+    # Update indicators
+    cumulative_volume += volume
+    momentum_window.append(price)
+    order_book_depth.append(bid_size - ask_size)  # Positive = Buy pressure, Negative = Sell pressure
+
+    # Compute signals
+    is_trending = compute_momentum()
+    is_buy_pressure = compute_order_book_imbalance()
+
+    # Execute trade logic
+    if cumulative_volume > volume_threshold and is_trending and is_buy_pressure:
+        place_order("buy", price)
+        cumulative_volume = 0  # Reset after trade
+
+def start_websocket():
+    """Start real-time market data feed."""
+    ws = websocket.WebSocketApp(WS_URL, on_message=on_message)
+    ws.run_forever()
+
+if __name__ == "__main__":
+    asyncio.run(fetch_market_data())
+    start_websocket()
