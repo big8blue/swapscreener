@@ -1,13 +1,12 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime, timedelta
 
-# ✅ Corrected CoinDCX API URL
+# ✅ Correct CoinDCX API URL
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 
-# ✅ Streamlit Page Configuration
+# ✅ Set Page Configuration
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 
 st.title("🚀 Real-Time Crypto Futures Screener")
@@ -33,27 +32,38 @@ min_volume, max_volume = st.sidebar.slider(
 # ✅ Refresh Rate Selection
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
-# ✅ Function to Fetch Data (No caching for real-time updates)
+# ✅ Function to Fetch Data
 def fetch_data():
-    """Fetch all active futures data from CoinDCX API."""
+    """Fetch active futures data from CoinDCX API and handle API structure."""
     try:
         response = requests.get(API_URL)
         data = response.json()
 
-        if not data:
+        # 🔍 Debug API response (Print JSON structure to see actual keys)
+        if isinstance(data, list):
+            st.write("API Response Sample:", data[:2])  # Print first 2 items
+
+        if not data or not isinstance(data, list):  # Ensure response is a list
             return pd.DataFrame()
 
+        # ✅ Convert JSON response into DataFrame
         df = pd.DataFrame(data)
 
-        # ✅ Adjust column names to match API response
-        df = df[["symbol", "mark_price", "volume", "timestamp"]]  # ✅ Ensure correct column names
-        df.columns = ["Symbol", "Price", "Volume", "Timestamp"]
-        df["Price"] = df["Price"].astype(float)
-        df["Volume"] = df["Volume"].astype(float) / 1_000_000  # Convert volume to Millions (M)
-        df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
+        # 🔍 Display actual column names for debugging
+        st.write("Available Columns:", df.columns.tolist())
 
-        # ✅ Filter for USDT futures
-        df = df[df["Symbol"].str.endswith("_USDT")]
+        # ✅ Dynamically filter relevant columns
+        required_columns = ["symbol", "mark_price", "volume", "timestamp"]
+        df = df[[col for col in required_columns if col in df.columns]]
+
+        if set(required_columns).issubset(df.columns):
+            df.columns = ["Symbol", "Price", "Volume", "Timestamp"]
+            df["Price"] = df["Price"].astype(float)
+            df["Volume"] = df["Volume"].astype(float) / 1_000_000  # Convert volume to Millions (M)
+            df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
+
+            # ✅ Filter for USDT futures
+            df = df[df["Symbol"].str.endswith("_USDT")]
 
         return df
 
@@ -66,11 +76,11 @@ def convert_to_ist(utc_time):
     ist_time = utc_time + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%I:%M:%S %p")
 
-# ✅ Live Updates with Auto Refresh
+# ✅ Live Updates (No Infinite Loop)
 placeholder = st.empty()
 
-# ✅ Streamlit auto-refresh mechanism (removes infinite loop)
-while True:
+# ✅ Main Data Refreshing Loop (Streamlit handles reruns)
+def update_data():
     df = fetch_data()
 
     if not df.empty:
@@ -87,5 +97,6 @@ while True:
         with placeholder.container():
             st.dataframe(df.sort_values(by="Price", ascending=False), height=600)
 
-    time.sleep(refresh_rate)  # ✅ Refresh at user-selected interval
-    st.experimental_rerun()  # ✅ Properly updates Streamlit UI
+# ✅ Auto-refresh using Streamlit rerun (no need for while True)
+st.experimental_rerun()
+st.stop()
