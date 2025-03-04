@@ -32,26 +32,20 @@ def fetch_data():
 data = fetch_data()
 
 if data:
-    # Convert the list of dictionaries to a DataFrame
+    # Convert response to DataFrame
     df = pd.DataFrame(data)
 
-    # Display the first few rows
-    st.write("### API Data in Table Format")
+    # Display raw data to analyze structure
+    st.write("### Raw API Response in Table")
     st.dataframe(df)
 
-    # Extract specific columns if available
-    expected_columns = ["symbol", "mark_price", "volume", "timestamp"]
-    available_columns = [col for col in expected_columns if col in df.columns]
+    # Automatically detect available columns
+    st.write("### Extracted Columns:")
+    st.write(df.columns.tolist())
 
-    if available_columns:
-        df_filtered = df[available_columns]
-
-        # Convert timestamp if available
-        if "timestamp" in df_filtered.columns:
-            df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"], unit='ms')
-
-        st.write("### Processed Data")
-        st.dataframe(df_filtered)
-
+    # Display structured data (if valid columns exist)
+    if not df.empty and len(df.columns) > 1:
+        st.write("### Processed Data Table")
+        st.dataframe(df)
     else:
-        st.error("Expected columns are missing from API response")
+        st.warning("API response does not contain expected structured data.")
