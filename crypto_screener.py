@@ -1,64 +1,88 @@
 import streamlit as st
+import websocket
+import json
 import pandas as pd
-import requests
 import time
+import requests
+from datetime import datetime
 
-# API URL for USDT futures
-API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
+# Streamlit UI settings
+st.set_page_config(page_title="CoinDCX Futures Screener", layout="wide")
 
-def fetch_futures_data():
-    """Fetches real-time futures data from CoinDCX API and handles errors."""
+st.title("📈 CoinDCX Futures Screener")
+st.sidebar.header("Settings")
+
+# User-defined refresh interval
+refresh_time = st.sidebar.number_input("Set refresh time (seconds)", min_value=1, max_value=60, value=5, step=1)
+
+# WebSocket URL
+WS_URL = "wss://stream.coindcx.com/socket.io/?EIO=3&transport=websocket"
+
+# Initialize DataFrame
+columns = ["Futures Name", "Last Traded Price", "24h High", "24h Low", "24h Volume", "Change (%)", "Last Updated Time"]
+df = pd.DataFrame(columns=columns)
+
+# Fetch 24h market data from CoinDCX REST API
+def fetch_24h_data():
+    url = "https://api.coindcx.com/exchange/v1/markets"
     try:
-        response = requests.get(API_URL)
-
-        # Check if response is valid JSON
-        if response.status_code != 200:
-            st.error(f"API Error: {response.status_code}")
-            return pd.DataFrame()
-
+        response = requests.get(url)
         data = response.json()
+        market_data = {item["market"]: item for item in data}
+        return market_data
+    except:
+        return {}
 
-        # Check if API response is a list (expected format)
-        if not isinstance(data, list):
-            st.error("Unexpected API response format!")
-            return pd.DataFrame()
+# Function to process WebSocket messages
+def on_message(ws, message):
+    global df
+    try:
+        data = json.loads(message)
+        market_data = fetch_24h_data()
+        
+        if isinstance(data, list):
+            for item in data:
+                if "m" in item and "b" in item and "s" in item:
+                    futures_name = item["s"]
+                    last_price = float(item["b"])
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Get additional data
+                    if futures_name in market_data:
+                        high_24h = float(market_data[futures_name].get("high", 0))
+                        low_24h = float(market_data[futures_name].get("low", 0))
+                        volume_24h = float(market_data[futures_name].get("volume", 0))
+                        change_24h = float(market_data[futures_name].get("change_24_hour", 0))
+                    else:
+                        high_24h, low_24h, volume_24h, change_24h = 0, 0, 0, 0
 
-        # Extract required fields, handling missing data
-        futures_data = []
-        for item in data:
-            if isinstance(item, dict):  # Ensure item is a dictionary
-                futures_data.append({
-                    "Pair": item.get("symbol", "N/A"),  # Adjust key based on API response
-                    "LTP": item.get("mark_price", "N/A"),  # Corrected key for Last Traded Price
-                    "Updated Time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-                })
+                    new_row = {
+                        "Futures Name": futures_name,
+                        "Last Traded Price": last_price,
+                        "24h High": high_24h,
+                        "24h Low": low_24h,
+                        "24h Volume": volume_24h,
+                        "Change (%)": change_24h,
+                        "Last Updated Time": timestamp
+                    }
 
-        return pd.DataFrame(futures_data)
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True).drop_duplicates(subset=["Futures Name"], keep="last")
 
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return pd.DataFrame()
+    except json.JSONDecodeError:
+        pass
 
-# Streamlit App
-st.title("🚀 Real-Time Crypto Futures Screener")
+# Function to handle WebSocket connection
+def connect_websocket():
+    ws = websocket.WebSocketApp(WS_URL, on_message=on_message)
+    ws.run_forever()
 
-# Sidebar input for refresh interval
-refresh_seconds = st.sidebar.slider("Refresh Interval (seconds)", 1, 30, 5)
+# Run WebSocket in the background
+import threading
+ws_thread = threading.Thread(target=connect_websocket, daemon=True)
+ws_thread.start()
 
-# Placeholder for updating data
-data_placeholder = st.empty()
-
+# Streamlit UI display
 while True:
-    df = fetch_futures_data()
-    
-    # Display DataFrame
-    if not df.empty:
-        data_placeholder.dataframe(df)
-    else:
-        st.warning("No data available. Check API or try again later.")
-
-    # Wait for the refresh interval
-    time.sleep(refresh_seconds)
-
-    # Clear cache for new API request
-    st.cache_data.clear()
+    st.dataframe(df, use_container_width=True)
+    time.sleep(refresh_time)
+    st.experimental_rerun()
