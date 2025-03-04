@@ -5,6 +5,7 @@ import pandas as pd
 import requests
 from datetime import datetime
 import threading
+import time
 
 # Streamlit UI settings
 st.set_page_config(page_title="CoinDCX Futures Screener", layout="wide")
@@ -82,5 +83,8 @@ if "websocket_thread" not in st.session_state:
     st.session_state.websocket_thread = ws_thread
 
 # Display DataFrame with automatic refresh
-st.dataframe(st.session_state.df, use_container_width=True)
-st.experimental_rerun()
+data_placeholder = st.empty()
+
+while True:
+    data_placeholder.dataframe(st.session_state.df, use_container_width=True)
+    time.sleep(refresh_time)
