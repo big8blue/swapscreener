@@ -11,8 +11,8 @@ from collections import deque
 import os
 
 # Load API keys securely
-API_KEY = os.getenv("COINDCX_API_KEY")
-SECRET_KEY = os.getenv("COINDCX_SECRET_KEY")
+API_KEY = os.getenv("64fcb132c957dbfc1fd4db8f96d9cf69fb39684333abee29")
+SECRET_KEY = os.getenv("53866511d5f015b28cfaac863065eb75f9f0f9e26d5c905f890095604e7ca37d")
 
 if not API_KEY or not SECRET_KEY:
     raise ValueError("API keys missing! Set them as environment variables.")
