@@ -2,47 +2,48 @@ import streamlit as st
 import websocket
 import json
 import pandas as pd
+import time
 from datetime import datetime
 
-# Global variables
+# Global dictionary to store futures data
 futures_data = {}
 
-# Function to process WebSocket messages
+# WebSocket message handler
 def on_message(ws, message):
     global futures_data
     data = json.loads(message)
     
     for item in data:
         market = item.get("s", "Unknown")
-        price = item.get("bp", None)  # Best price (Last Traded Price)
+        price = item.get("bp", None)  # Best price (LTP)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if price:
             futures_data[market] = {"LTP": price, "Last Updated": timestamp}
 
-# Function to handle errors
+# WebSocket error handler
 def on_error(ws, error):
     st.error(f"WebSocket Error: {error}")
 
-# Function to handle WebSocket close
+# WebSocket close handler
 def on_close(ws, close_status_code, close_msg):
     st.warning("WebSocket Disconnected")
 
-# Function to initiate WebSocket connection
+# WebSocket open handler
 def on_open(ws):
     st.success("Connected to CoinDCX WebSocket")
     
-    # Subscribe to futures tickers
+    # Subscribe to market data
     subscription_payload = {
         "action": "subscribe",
         "channel": "market_data",
-        "symbols": ["B-PONKE_USDT", "B-COW_USDT", "B-CETUS_USDT"]  # Modify based on available tickers
+        "symbols": ["B-BTC_USDT", "B-ETH_USDT", "B-SOL_USDT"]  # Modify based on available futures
     }
     
     ws.send(json.dumps(subscription_payload))
 
 # Streamlit UI
-st.title("📈 Real-Time CoinDCX Futures Screener")
+st.title("📈 CoinDCX Real-Time Futures Screener")
 
 st.sidebar.header("Settings")
 refresh_time = st.sidebar.slider("Refresh Interval (seconds)", 1, 10, 3)
@@ -57,17 +58,17 @@ ws = websocket.WebSocketApp(
 
 ws.on_open = on_open
 
-# Start WebSocket in the background
+# Start WebSocket in a separate thread
 import threading
 ws_thread = threading.Thread(target=ws.run_forever)
 ws_thread.daemon = True
 ws_thread.start()
 
-# Main display loop
+# Streamlit main loop
 while True:
     if futures_data:
         df = pd.DataFrame.from_dict(futures_data, orient="index").reset_index()
         df.columns = ["Symbol", "LTP", "Last Updated"]
         st.dataframe(df)
 
-    st.sleep(refresh_time)
+    time.sleep(refresh_time)  # Fixed line
