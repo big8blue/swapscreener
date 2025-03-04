@@ -46,9 +46,13 @@ def get_futures_symbols():
     try:
         response = requests.get(MARKETS_URL, headers=HEADERS)
         data = response.json()
-        if not data:
+        
+        if not isinstance(data, list):  # Check if API response is not a list
+            st.error(f"Unexpected API response format: {data}")
             return []
-        return [m["market"] for m in data if "FUTURES" in m["market"] and m["market"].endswith("USDTFUT")]
+
+        return [m["market"] for m in data if isinstance(m, dict) and "FUTURES" in m.get("market", "") and m["market"].endswith("USDTFUT")]
+    
     except Exception as e:
         st.error(f"Error fetching futures symbols: {e}")
         return []
