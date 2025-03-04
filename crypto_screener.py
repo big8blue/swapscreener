@@ -44,22 +44,40 @@ def fetch_ltp(symbols):
 data = fetch_data()
 
 if data:
-    # Extract Symbols
+    # Print API response structure for debugging
+    st.write("### Debug: API Response")
+    st.json(data[:5])  # Show only first 5 items
+
+    # Convert response to DataFrame
     df = pd.DataFrame(data)
-    df = df[['symbol']]  # Keep only the symbol column
-    
-    # Fetch LTP for each symbol
-    symbols = df['symbol'].tolist()
-    ltp_data = fetch_ltp(symbols)
 
-    if ltp_data:
-        # Convert LTP response to a dictionary for easy lookup
-        ltp_dict = {item['market']: item['price'] for item in ltp_data}
+    # Check available columns
+    st.write("### Debug: Available Columns in DataFrame")
+    st.write(df.columns.tolist())
 
-        # Add LTP column to DataFrame
-        df['LTP'] = df['symbol'].map(ltp_dict)
-    
-    st.write("### Crypto Futures Data with LTP")
-    st.dataframe(df)
+    # Look for the correct column name
+    expected_columns = ['symbol', 'market', 'pair']
+    found_columns = [col for col in expected_columns if col in df.columns]
+
+    if found_columns:
+        df = df[[found_columns[0]]]  # Use the first matching column
+        df.rename(columns={found_columns[0]: 'symbol'}, inplace=True)
+
+        # Fetch LTP for each symbol
+        symbols = df['symbol'].tolist()
+        ltp_data = fetch_ltp(symbols)
+
+        if ltp_data:
+            # Convert LTP response to a dictionary for easy lookup
+            ltp_dict = {item['market']: item['price'] for item in ltp_data}
+
+            # Add LTP column to DataFrame
+            df['LTP'] = df['symbol'].map(ltp_dict)
+
+        st.write("### Crypto Futures Data with LTP")
+        st.dataframe(df)
+    else:
+        st.error("❌ No valid symbol column found in API response.")
+
 else:
     st.warning("⚠️ No data received from API.")
