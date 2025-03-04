@@ -25,7 +25,7 @@ df = pd.DataFrame(columns=columns)
 
 # Fetch 24h market data from CoinDCX REST API
 def fetch_24h_data():
-    url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name"
+    url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
     try:
         response = requests.get(url)
         data = response.json()
