@@ -5,6 +5,7 @@ import pandas as pd
 import time
 import requests
 from datetime import datetime
+import threading
 
 # Streamlit UI settings
 st.set_page_config(page_title="CoinDCX Futures Screener", layout="wide")
@@ -24,7 +25,7 @@ df = pd.DataFrame(columns=columns)
 
 # Fetch 24h market data from CoinDCX REST API
 def fetch_24h_data():
-    url = "https://api.coindcx.com/exchange/v1/markets"
+    url = "https://api.coindcx.com/exchange/ticker"
     try:
         response = requests.get(url)
         data = response.json()
@@ -77,12 +78,11 @@ def connect_websocket():
     ws.run_forever()
 
 # Run WebSocket in the background
-import threading
 ws_thread = threading.Thread(target=connect_websocket, daemon=True)
 ws_thread.start()
 
-# Streamlit UI display
+# Streamlit UI update loop
+table_placeholder = st.empty()
 while True:
-    st.dataframe(df, use_container_width=True)
+    table_placeholder.dataframe(df, use_container_width=True)
     time.sleep(refresh_time)
-    st.experimental_rerun()
