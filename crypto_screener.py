@@ -12,7 +12,7 @@ st.title("📈 JASMY Futures Screener (Real-Time)")
 
 # WebSocket URL
 WS_URL = "wss://stream.coindcx.com/market_data"
-REST_API_URL = "https://api.coindcx.com/exchange/ticker"
+REST_API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]=USDT"
 
 # Initialize session state
 if "jasmy_data" not in st.session_state:
