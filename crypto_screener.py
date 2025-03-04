@@ -1,49 +1,60 @@
 import json
 import websocket
-import requests
-import os
-from dotenv import load_dotenv
 
-# Load API Keys securely from .env
-load_dotenv()
-API_KEY = os.getenv("COINDCX_API_KEY")
-
-# Get user input for trading pair
+# User input for futures trading pair (e.g., JASMYUSDT)
 TRADE_SYMBOL = input("Enter the futures trading pair (e.g., JASMYUSDT): ").strip().upper()
 
-# CoinDCX Futures WebSocket URL
-WS_URL = "wss://public.coindcx.com"
+# CoinDCX WebSocket URL
+WS_URL = "wss://stream.coindcx.com/ws/v1"
 
-def fetch_funding_rate(symbol):
-    """Fetch current funding rate for the futures pair."""
-    url = f"https://api.coindcx.com/exchange/v1/funding_rate?symbol={symbol}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get("funding_rate", "N/A")
-    return "N/A"
+# Subscription message for futures data
+subscribe_message = {
+    "channel": "ticker",
+    "payload": {
+        "symbol": TRADE_SYMBOL
+    }
+}
 
 def on_message(ws, message):
-    """Process real-time futures data from WebSocket."""
+    """Handle incoming WebSocket messages and display live market data."""
     data = json.loads(message)
+    
+    if 'ticker' in data:
+        ticker = data['ticker']
+        price = float(ticker.get('last_price', 0))
+        bid_price = float(ticker.get('best_bid', 0))
+        ask_price = float(ticker.get('best_ask', 0))
+        volume = float(ticker.get('volume', 0))
 
-    # Extract relevant data
-    price = float(data.get('p', 0))
-    volume = float(data.get('v', 0))
-    bid_price = float(data.get('b', 0))
-    ask_price = float(data.get('a', 0))
-    funding_rate = fetch_funding_rate(TRADE_SYMBOL)
+        # Display real-time futures data
+        print(f"\n🔹 **{TRADE_SYMBOL} Futures Data** 🔹")
+        print(f"📌 Current Price: ${price}")
+        print(f"📈 Best Bid: ${bid_price}  |  📉 Best Ask: ${ask_price}")
+        print(f"💰 24h Volume: {volume}")
+        print("-" * 40)
 
-    # Display real-time futures data
-    print(f"\n🔹 **{TRADE_SYMBOL} Futures Data** 🔹")
-    print(f"📌 Current Price: ${price}")
-    print(f"📈 Bid Price: ${bid_price}  |  📉 Ask Price: ${ask_price}")
-    print(f"💰 24h Volume: {volume}")
-    print(f"⚡ Funding Rate: {funding_rate}%")
-    print("-" * 40)
+def on_open(ws):
+    """Send subscription message once the WebSocket connection opens."""
+    ws.send(json.dumps(subscribe_message))
+    print(f"📡 Connected! Listening for {TRADE_SYMBOL} futures data...")
+
+def on_error(ws, error):
+    """Handle WebSocket errors."""
+    print(f"❌ WebSocket Error: {error}")
+
+def on_close(ws, close_status, close_message):
+    """Handle WebSocket closing."""
+    print("🔴 WebSocket Disconnected.")
 
 def start_websocket():
     """Start real-time market data feed."""
-    ws = websocket.WebSocketApp(WS_URL, on_message=on_message)
+    ws = websocket.WebSocketApp(
+        WS_URL,
+        on_open=on_open,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close
+    )
     ws.run_forever()
 
 if __name__ == "__main__":
