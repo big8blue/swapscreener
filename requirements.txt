@@ -10,3 +10,5 @@ pandas as pd
 time
 datetime 
 datetime, timedelta
+requests
+pandas
