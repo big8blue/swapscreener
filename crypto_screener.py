@@ -7,8 +7,8 @@ sio = socketio.Client()
 
 sio.connect(socketEndpoint, transports = 'websocket')
 
-key = "XXXX"
-secret = "YYYY"
+key = "64fcb132c957dbfc1fd4db8f96d9cf69fb39684333abee29"
+secret = "53866511d5f015b28cfaac863065eb75f9f0f9e26d5c905f890095604e7ca37d"
 
 # python3
 secret_bytes = bytes(secret, encoding='utf-8')
