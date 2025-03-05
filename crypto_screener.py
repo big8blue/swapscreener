@@ -2,71 +2,57 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# API Endpoints
-FUTURES_API = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
-LTP_API = "https://public.coindcx.com/market_data/v3/current_prices/futures/rt"
+API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
 
 st.sidebar.header("🔍 Filters")
+
 refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", 1, 10, 1)
 
 @st.cache_data(ttl=refresh_rate)
-def fetch_futures_data():
+def fetch_data():
     """Fetch all swap futures tickers from CoinDCX API."""
     try:
-        response = requests.get(FUTURES_API)
-        data = response.json()
-        
+        response = requests.get(API_URL)
+        data = response.json()  # Convert response to JSON
+
+        # Ensure response is a list
         if isinstance(data, list):
-            return pd.DataFrame(data)
+            return data
         else:
             st.error("Unexpected API response format")
-            return pd.DataFrame()
+            return None
 
     except Exception as e:
         st.error(f"Error fetching data: {e}")
-        return pd.DataFrame()
+        return None
 
-@st.cache_data(ttl=refresh_rate)
-def fetch_ltp_data():
-    """Fetch real-time LTP data from CoinDCX API."""
-    try:
-        response = requests.get(LTP_API)
-        ltp_data = response.json()
-        
-        if isinstance(ltp_data, dict) and "prices" in ltp_data:
-            df_ltp = pd.DataFrame(ltp_data["prices"])
-            df_ltp = df_ltp.rename(columns={"s": "symbol", "p": "LTP"})  # Rename columns
-            df_ltp["LTP"] = df_ltp["LTP"].astype(float)  # Convert LTP to float
-            return df_ltp
-        else:
-            st.error("Unexpected LTP API response format")
-            return pd.DataFrame()
+data = fetch_data()
 
-    except Exception as e:
-        st.error(f"Error fetching LTP data: {e}")
-        return pd.DataFrame()
+if data:
+    # Convert the list of dictionaries to a DataFrame
+    df = pd.DataFrame(data)
 
-# Fetch data
-df_futures = fetch_futures_data()
-df_ltp = fetch_ltp_data()
+    # Display the first few rows
+    st.write("### API Data in Table Format")
+    st.dataframe(df)
 
-if not df_futures.empty and not df_ltp.empty:
-    # Merge futures data with LTP
-    df_merged = df_futures.merge(df_ltp, on="symbol", how="left")
+    # Extract specific columns if available
+    expected_columns = ["symbol", "mark_price", "volume", "timestamp"]
+    available_columns = [col for col in expected_columns if col in df.columns]
 
-    # Select relevant columns
-    expected_columns = ["symbol", "mark_price", "volume", "timestamp", "LTP"]
-    df_display = df_merged[[col for col in expected_columns if col in df_merged.columns]]
+    if available_columns:
+        df_filtered = df[available_columns]
 
-    # Convert timestamp if available
-    if "timestamp" in df_display.columns:
-        df_display["timestamp"] = pd.to_datetime(df_display["timestamp"], unit="ms")
+        # Convert timestamp if available
+        if "timestamp" in df_filtered.columns:
+            df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"], unit='ms')
 
-    st.write("### 🔥 Crypto Futures with LTP")
-    st.dataframe(df_display)
+        st.write("### Processed Data")
+        st.dataframe(df_filtered)
 
-else:
-    st.error("Failed to fetch data from APIs")
+    else:
+        st.error("Expected columns are missing from API response")
+
