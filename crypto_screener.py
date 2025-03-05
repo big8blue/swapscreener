@@ -8,7 +8,7 @@ LTP_URL = "https://public.coindcx.com/market_data/v3/current_prices/futures/data
 
 url = "https://public.coindcx.com/market_data/v3/current_prices/futures/rt"
 response = requests.get(url)
-data = response.json()
+data=response.json()
 print(data)
 print(json.dumps(data, indent=2))
 
