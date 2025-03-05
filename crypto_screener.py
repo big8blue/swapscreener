@@ -33,7 +33,6 @@ def fetch_symbols():
 
 # Fetch symbols and LTP data
 symbols = fetch_symbols()
-ltp_data = fetch_ltp()
 
 if symbols and ltp_data:
     # Create DataFrame
