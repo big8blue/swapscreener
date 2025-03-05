@@ -19,6 +19,11 @@ def fetch_data():
     try:
         response = requests.get(INSTRUMENTS_API)
         data = response.json()
+
+        # Print response structure for debugging
+        st.write("### Debug: API Response Sample")
+        st.json(data[:3])  # Show first 3 entries
+
         return data if isinstance(data, list) else None
     except Exception as e:
         st.error(f"Error fetching futures data: {e}")
@@ -42,14 +47,18 @@ data = fetch_data()
 if data:
     df = pd.DataFrame(data)
 
-    # Extract relevant columns
-    expected_columns = ["symbol", "mark_price", "volume", "timestamp"]
-    available_columns = [col for col in expected_columns if col in df.columns]
+    # Show available columns
+    st.write("### Debug: Available Columns in API Response")
+    st.write(df.columns.tolist())
+
+    # Extract available columns dynamically
+    essential_columns = ["symbol", "mark_price", "volume", "timestamp"]
+    available_columns = [col for col in essential_columns if col in df.columns]
 
     if available_columns:
         df_filtered = df[available_columns]
 
-        # Convert timestamp
+        # Convert timestamp if available
         if "timestamp" in df_filtered.columns:
             df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"], unit='ms')
 
@@ -64,8 +73,8 @@ if data:
 
         df_filtered["LTP"] = ltp_values  # Add LTP Column
 
-        # Display data
+        # Display processed data
         st.write("### Processed Data with LTP")
         st.dataframe(df_filtered)
     else:
-        st.error("Expected columns are missing from API response")
+        st.error("No matching columns found. Check the API response above.")
