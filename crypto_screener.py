@@ -1,46 +1,33 @@
 import socketio
+import hmac
+import hashlib
 import json
-import time
-
-# CoinDCX WebSocket Endpoint
 socketEndpoint = 'wss://stream.coindcx.com'
+sio = socketio.Client()
 
-# Initialize SocketIO Client
-sio = socketio.Client(reconnection=True, reconnection_attempts=5, logger=True, engineio_logger=True)
+sio.connect(socketEndpoint, transports = 'websocket')
 
-# Event: Connection Established
-@sio.event
-def connect():
-    print("✅ Successfully connected to CoinDCX WebSocket!")
+key = "XXXX"
+secret = "YYYY"
 
-# Event: Connection Error
-@sio.event
-def connect_error(data):
-    print("❌ Connection failed. Retrying...")
+# python3
+secret_bytes = bytes(secret, encoding='utf-8')
+# python2
+secret_bytes = bytes(secret)
 
-# Event: Disconnected
-@sio.event
-def disconnect():
-    print("🔴 Disconnected from WebSocket. Reconnecting in 5s...")
-    time.sleep(5)
-    sio.connect(socketEndpoint, transports=['websocket'])
+body = {"channel":"coindcx"}
+json_body = json.dumps(body, separators = (',', ':'))
+signature = hmac.new(secret_bytes, json_body.encode(), hashlib.sha256).hexdigest()
 
-# Subscribe to Futures Price Updates
-@sio.on('currentPrices@futures#update')
+# Join channel
+sio.emit('join', { 'channelName': 'coindcx', 'authSignature': signature, 'apiKey' : key })
+
+### Listen update on eventName
+### Replace the <eventName> with the df-position-update, df-order-update, ###balance-update
+
+@sio.on(<eventName>) 
 def on_message(response):
-    try:
-        data = response.get("data", [])
-        if data:
-            print("📊 Real-Time Futures Prices:", data)
-        else:
-            print("⚠️ No price data received!")
-    except Exception as e:
-        print(f"🚨 Error processing message: {e}")
+    print(response["data"])
 
-# Connect and Start Listening
-try:
-    sio.connect(socketEndpoint, transports=['websocket'])
-    sio.wait()
-except KeyboardInterrupt:
-    print("❌ WebSocket connection closed by user.")
-    sio.disconnect()
+# leave a channel
+sio.emit('leave', { 'channelName' : 'coindcx' })
