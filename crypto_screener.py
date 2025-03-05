@@ -4,7 +4,7 @@ import pandas as pd
 
 # API URLs
 INSTRUMENTS_API = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
-LTP_API = "https://public.coindcx.com/market_data/v3/current_prices/futures/rt"
+TRADE_HISTORY_API = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/trades?pair={}"
 
 # Streamlit UI Setup
 st.set_page_config(page_title="Crypto Screener", layout="wide")
@@ -24,20 +24,20 @@ def fetch_data():
         st.error(f"Error fetching futures data: {e}")
         return None
 
-@st.cache_data(ttl=refresh_rate)
-def fetch_ltp():
-    """Fetch real-time Last Traded Prices (LTP) from CoinDCX API."""
+def fetch_ltp(symbol):
+    """Fetch the latest traded price (LTP) for a specific symbol."""
     try:
-        response = requests.get(LTP_API)
-        data = response.json()
-        return {item["s"]: item["p"] for item in data.get("data", [])}  # Convert to dictionary {symbol: price}
+        response = requests.get(TRADE_HISTORY_API.format(symbol))
+        trade_data = response.json()
+
+        if isinstance(trade_data, list) and trade_data:
+            return float(trade_data[0]["p"])  # Extract latest trade price
+        return None
     except Exception as e:
-        st.error(f"Error fetching LTP: {e}")
-        return {}
+        return None  # Return None if error occurs
 
 # Fetch Data
 data = fetch_data()
-ltp_data = fetch_ltp()
 
 if data:
     df = pd.DataFrame(data)
@@ -53,8 +53,16 @@ if data:
         if "timestamp" in df_filtered.columns:
             df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"], unit='ms')
 
-        # Add LTP Column
-        df_filtered["LTP"] = df_filtered["symbol"].map(ltp_data)
+        # Fetch LTP for each symbol (Loop with progress bar)
+        ltp_values = []
+        progress_bar = st.progress(0)
+
+        for idx, symbol in enumerate(df_filtered["symbol"]):
+            ltp = fetch_ltp(symbol)
+            ltp_values.append(ltp if ltp is not None else "N/A")
+            progress_bar.progress((idx + 1) / len(df_filtered))
+
+        df_filtered["LTP"] = ltp_values  # Add LTP Column
 
         # Display data
         st.write("### Processed Data with LTP")
