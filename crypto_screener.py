@@ -4,7 +4,7 @@ import pandas as pd
 
 # API Endpoints
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
-LTP_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/trades?pair=active_instruments"
+LTP_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/trades?pair="
 
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
