@@ -31,24 +31,12 @@ def fetch_futures_data():
 
 @st.cache_data(ttl=refresh_rate)
 def fetch_ltp_data():
-    """Fetch real-time LTP data from CoinDCX API."""
-    try:
-        response = requests.get(LTP_URL)
-        ltp_data = response.json()
-        
-        if isinstance(ltp_data, dict) and "prices" in ltp_data:
-            df_ltp = pd.DataFrame(ltp_data["prices"])
-            df_ltp = df_ltp.rename(columns={"s": "symbol", "p": "LTP"})  # Rename columns
-            df_ltp["LTP"] = df_ltp["LTP"].astype(float)  # Convert LTP to float
-            return df_ltp
-        else:
-            st.error("Unexpected LTP API response format")
-            return pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"Error fetching LTP data: {e}")
-        return pd.DataFrame()
-
+  import requests  # Install requests module first.
+url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/trades?pair={instrument_name}"
+#sample_url = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/trades?pair=B-MKR_USDT"
+response = requests.get(url)
+data = response.json()
+print(data)
 # Fetch data
 df_futures = fetch_futures_data()
 df_ltp = fetch_ltp_data()
