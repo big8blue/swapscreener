@@ -10,7 +10,7 @@ url = "https://public.coindcx.com/market_data/v3/current_prices/futures/rt"
 response = requests.get(url)
 data=response.json()
 print(data)
-print(json.dumps)
+
 
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
