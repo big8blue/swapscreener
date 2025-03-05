@@ -9,3 +9,6 @@ websocket-client
 numpy
 python-dotenv
 socketio
+hmac
+hashlib
+json
