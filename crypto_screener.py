@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timedelta
 
 # OKX API for Swap Futures
-API_URL = "GET https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]={futures_margin_mode}"
+API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments?margin_currency_short_name[]={futures_margin_mode}"
 
 # Set Page Configuration
 st.set_page_config(page_title="Crypto Screener", layout="wide")
