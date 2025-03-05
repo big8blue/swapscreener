@@ -8,3 +8,4 @@ aiohttp
 websocket-client   
 numpy
 python-dotenv
+socketio
