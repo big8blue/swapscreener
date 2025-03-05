@@ -29,21 +29,7 @@ def fetch_symbols():
         st.error(f"Error fetching symbols: {e}")
         return None
 
-@st.cache_data(ttl=refresh_rate)
-def fetch_ltp():
-    """Fetch real-time LTP prices."""
-    try:
-        response = requests.get(LTP_API)
-        data = response.json()
 
-        if isinstance(data, dict) and "data" in data:
-            return {item["symbol"]: item["price"] for item in data["data"]}
-        else:
-            st.error("Unexpected API response format for LTP.")
-            return None
-    except Exception as e:
-        st.error(f"Error fetching LTP data: {e}")
-        return None
 
 # Fetch symbols and LTP data
 symbols = fetch_symbols()
