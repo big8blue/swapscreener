@@ -6,12 +6,6 @@ import pandas as pd
 API_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/data/active_instruments"
 LTP_URL = "https://public.coindcx.com/market_data/v3/current_prices/futures/data/active_instruments/rt"
 
-url = "https://public.coindcx.com/market_data/v3/current_prices/futures/rt"
-response = requests.get(url)
-data=response.json()
-print(data)
-
-
 st.set_page_config(page_title="Crypto Screener", layout="wide")
 st.title("🚀 Real-Time Crypto Futures Screener")
 
