@@ -5,9 +5,7 @@ pandas_ta
 setuptools
 ta
 aiohttp
-websocket-client   
 numpy
 python-dotenv
 socketio
-hashlib
 json
