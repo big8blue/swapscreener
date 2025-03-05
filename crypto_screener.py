@@ -25,9 +25,8 @@ sio.emit('join', { 'channelName': 'coindcx', 'authSignature': signature, 'apiKey
 ### Listen update on eventName
 ### Replace the <eventName> with the df-position-update, df-order-update, ###balance-update
 
-@sio.on(<eventName>) 
+@sio.on('balance-update')
 def on_message(response):
-    print(response["data"])
-
+  print(response["data"])
 # leave a channel
 sio.emit('leave', { 'channelName' : 'coindcx' })
